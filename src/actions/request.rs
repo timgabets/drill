@@ -81,25 +81,32 @@ impl Request {
   }
 
   fn send_request(&self, context: &mut HashMap<String, Yaml>, responses: &mut HashMap<String, serde_json::Value>, config: &config::Config) -> (Option<Response>, f64) {
-    // Build a TSL connector
-    let mut connector_builder = TlsConnector::builder();
-    connector_builder.danger_accept_invalid_certs(config.no_check_certificate);
+    let begin = time::precise_time_s();
 
-    let ssl = NativeTlsClient::from(connector_builder.build().unwrap());
-    let connector = HttpsConnector::new(ssl);
-    let client = Client::with_connector(connector);
+    let client = if self.url.starts_with("https") {
+      // Build a TSL connector
+      let mut connector_builder = TlsConnector::builder();
+      connector_builder.danger_accept_invalid_certs(config.no_check_certificate);
 
-    let interpolated_name;
-    let interpolated_url;
-    let interpolated_body;
-    let request;
+      let ssl = NativeTlsClient::from(connector_builder.build().unwrap());
+      let connector = HttpsConnector::new(ssl);
+
+      Client::with_connector(connector)
+    } else {
+      Client::new()
+    };
 
     // Resolve the url
-    {
+    let (interpolated_name, interpolated_url) = if self.name.contains("{") || self.url.contains("{") {
       let interpolator = interpolator::Interpolator::new(context, responses);
-      interpolated_name = interpolator.resolve(&self.name);
-      interpolated_url = interpolator.resolve(&self.url);
-    }
+
+      (interpolator.resolve(&self.name), interpolator.resolve(&self.url))
+    } else {
+      (self.name.clone(), format!("http://localhost:9000{}", self.url.clone()))
+    };
+
+    let interpolated_body;
+    let request;
 
     // Method
     let method = match self.method.to_uppercase().as_ref() {
@@ -139,7 +146,6 @@ impl Request {
       headers.set_raw(key.to_owned(), vec![interpolated_header.clone().into_bytes()]);
     }
 
-    let begin = time::precise_time_s();
     let response_result = request.headers(headers).send();
     let duration_ms = (time::precise_time_s() - begin) * 1000.0;
 
