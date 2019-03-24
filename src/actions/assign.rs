@@ -6,6 +6,7 @@ use yaml_rust::Yaml;
 
 use config;
 
+use hyper::client::Client;
 use actions::{Report, Runnable};
 
 #[derive(Clone)]
@@ -30,7 +31,7 @@ impl Assign {
 }
 
 impl Runnable for Assign {
-  fn execute(&self, context: &mut HashMap<String, Yaml>, _responses: &mut HashMap<String, Value>, _reports: &mut Vec<Report>, _config: &config::Config) {
+  fn execute(&self, _client: &Client, context: &mut HashMap<String, Yaml>, _responses: &mut HashMap<String, Value>, _reports: &mut Vec<Report>, _config: &config::Config) {
     if !_config.quiet {
       println!("{:width$} {}={}", self.name.green(), self.key.cyan().bold(), self.value.magenta(), width = 25);
     }

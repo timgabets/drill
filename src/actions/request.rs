@@ -6,8 +6,9 @@ use serde_json;
 use time;
 use yaml_rust::Yaml;
 
+use hyper::client::pool;
 use hyper::client::{Client, Response};
-use hyper::header::{Cookie, Headers, SetCookie, UserAgent};
+use hyper::header::{Connection, Cookie, Headers, SetCookie, UserAgent};
 use hyper::method::Method;
 use hyper::net::HttpsConnector;
 use hyper_native_tls::native_tls::TlsConnector;
@@ -80,21 +81,23 @@ impl Request {
     }
   }
 
-  fn send_request(&self, context: &mut HashMap<String, Yaml>, responses: &mut HashMap<String, serde_json::Value>, config: &config::Config) -> (Option<Response>, f64) {
+  fn send_request(&self, client: &Client, context: &mut HashMap<String, Yaml>, responses: &mut HashMap<String, serde_json::Value>, config: &config::Config) -> (Option<Response>, f64) {
     let begin = time::precise_time_s();
 
-    let client = if self.url.starts_with("https") {
-      // Build a TSL connector
-      let mut connector_builder = TlsConnector::builder();
-      connector_builder.danger_accept_invalid_certs(config.no_check_certificate);
+    // let client = if self.url.starts_with("https") {
+    //   // Build a TSL connector
+    //   let mut connector_builder = TlsConnector::builder();
+    //   connector_builder.danger_accept_invalid_certs(config.no_check_certificate);
 
-      let ssl = NativeTlsClient::from(connector_builder.build().unwrap());
-      let connector = HttpsConnector::new(ssl);
+    //   let ssl = NativeTlsClient::from(connector_builder.build().unwrap());
+    //   let connector = HttpsConnector::new(ssl);
 
-      Client::with_connector(connector)
-    } else {
-      Client::new()
-    };
+
+    //   Client::with_connector(connector)
+    // } else {
+    //   let pool_config = pool::Config { max_idle: 5 };
+    //   Client::with_pool_config(pool_config)
+    // };
 
     // Resolve the url
     let (interpolated_name, interpolated_url) = if self.name.contains("{") || self.url.contains("{") {
@@ -132,6 +135,7 @@ impl Request {
 
     // Headers
     let mut headers = Headers::new();
+    headers.set(Connection::keep_alive());
     headers.set(UserAgent(USER_AGENT.to_string()));
 
     if let Some(cookie) = context.get("cookie") {
@@ -175,12 +179,12 @@ impl Request {
 }
 
 impl Runnable for Request {
-  fn execute(&self, context: &mut HashMap<String, Yaml>, responses: &mut HashMap<String, serde_json::Value>, reports: &mut Vec<Report>, config: &config::Config) {
+  fn execute(&self, client: &Client, context: &mut HashMap<String, Yaml>, responses: &mut HashMap<String, serde_json::Value>, reports: &mut Vec<Report>, config: &config::Config) {
     if self.with_item.is_some() {
       context.insert("item".to_string(), self.with_item.clone().unwrap());
     }
 
-    let (res, duration_ms) = self.send_request(context, responses, config);
+    let (res, duration_ms) = self.send_request(client, context, responses, config);
 
     match res {
       None => reports.push(Report {

@@ -6,6 +6,9 @@ use std::time;
 use serde_json::Value;
 use yaml_rust::Yaml;
 
+use hyper::client::pool;
+use hyper::client::Client;
+
 use actions::{Report, Runnable};
 use config;
 use expandable::include;
@@ -18,6 +21,8 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
   thread::sleep(time::Duration::new((delay * thread) as u64, 0));
 
   let mut global_reports = Vec::new();
+  let pool_config = pool::Config { max_idle: 5 };
+  let client = Client::with_pool_config(pool_config);
 
   for iteration in 0..config.iterations {
     let mut responses: HashMap<String, Value> = HashMap::new();
@@ -29,7 +34,7 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
     context.insert("base".to_string(), Yaml::String(config.base.to_string()));
 
     for item in benchmark.iter() {
-      item.execute(&mut context, &mut responses, &mut reports, &config);
+      item.execute(&client, &mut context, &mut responses, &mut reports, &config);
     }
 
     global_reports.push(reports);
