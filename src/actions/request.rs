@@ -96,6 +96,8 @@ impl Request {
       self.url.clone()
     };
 
+    println!("Step01: {}", (time::precise_time_s() - begin));
+
     // Resolve relative urls
     let interpolated_base_url = if &interpolated_url[..1] == "/" {
       match context.get("base") {
@@ -114,6 +116,8 @@ impl Request {
       interpolated_url
     };
 
+    println!("Step02: {}", (time::precise_time_s() - begin));
+
     let client = if interpolated_base_url.starts_with("https") {
       // Build a TSL connector
       let mut connector_builder = TlsConnector::builder();
@@ -126,6 +130,8 @@ impl Request {
     } else {
       Client::new()
     };
+
+    println!("Step03: {}", (time::precise_time_s() - begin));
 
     let interpolated_body;
 
@@ -140,6 +146,8 @@ impl Request {
       _ => panic!("Unknown method '{}'", self.method),
     };
 
+    println!("Step04: {}", (time::precise_time_s() - begin));
+
     // Resolve the body
     let request = if let Some(body) = self.body.as_ref() {
       interpolated_body = uninterpolator.get_or_insert(interpolator::Interpolator::new(context, responses)).resolve(body);
@@ -149,6 +157,8 @@ impl Request {
       client.request(method, interpolated_base_url.as_str())
     };
 
+    println!("Step05: {}", (time::precise_time_s() - begin));
+
     // Headers
     let mut headers = Headers::new();
     headers.set(UserAgent(USER_AGENT.to_string()));
@@ -157,6 +167,8 @@ impl Request {
       headers.set(Cookie(vec![String::from(cookie.as_str().unwrap())]));
     }
 
+    println!("Step06: {}", (time::precise_time_s() - begin));
+
     // Resolve headers
     for (key, val) in self.headers.iter() {
       let interpolated_header = uninterpolator.get_or_insert(interpolator::Interpolator::new(context, responses)).resolve(val);
@@ -164,8 +176,22 @@ impl Request {
       headers.set_raw(key.to_owned(), vec![interpolated_header.clone().into_bytes()]);
     }
 
+    println!("Step07: {}", (time::precise_time_s() - begin));
+
+    // client.request(Method::Get, interpolated_base_url.as_str()).send().expect("Yolo");
+    // client.request(Method::Get, interpolated_base_url.as_str()).send().expect("Yolo");
+    // client.request(Method::Get, interpolated_base_url.as_str()).send().expect("Yolo");
+    // client.request(Method::Get, interpolated_base_url.as_str()).send().expect("Yolo");
+    // client.request(Method::Get, interpolated_base_url.as_str()).send().expect("Yolo");
+    // client.request(Method::Get, interpolated_base_url.as_str()).send().expect("Yolo");
+    // client.request(Method::Get, interpolated_base_url.as_str()).send().expect("Yolo");
+    // client.request(Method::Get, interpolated_base_url.as_str()).send().expect("Yolo");
+
     let response_result = request.headers(headers).send();
+
     let duration_ms = (time::precise_time_s() - begin) * 1000.0;
+
+    println!("Step08: {}", (time::precise_time_s() - begin));
 
     match response_result {
       Err(e) => {
@@ -195,6 +221,8 @@ impl Request {
 
 impl Runnable for Request {
   fn execute(&self, context: &mut HashMap<String, Yaml>, responses: &mut HashMap<String, serde_json::Value>, reports: &mut Vec<Report>, config: &config::Config) {
+    let begin = time::precise_time_s();
+
     if self.with_item.is_some() {
       context.insert("item".to_string(), self.with_item.clone().unwrap());
     }
@@ -208,11 +236,15 @@ impl Runnable for Request {
         status: 520u16,
       }),
       Some(mut response) => {
+        println!("Step09: {}", (time::precise_time_s() - begin));
+
         reports.push(Report {
           name: self.name.to_owned(),
           duration: duration_ms,
           status: response.status.to_u16(),
         });
+
+        println!("Step10: {}", (time::precise_time_s() - begin));
 
         if let Some(&SetCookie(ref cookies)) = response.headers.get::<SetCookie>() {
           if let Some(cookie) = cookies.iter().next() {
@@ -222,6 +254,8 @@ impl Runnable for Request {
         }
 
         if let Some(ref key) = self.assign {
+          println!("Step11: {}", (time::precise_time_s() - begin));
+
           let mut data = String::new();
 
           response.read_to_string(&mut data).unwrap();
@@ -232,5 +266,8 @@ impl Runnable for Request {
         }
       }
     }
+
+    println!("Step12: {}", (time::precise_time_s() - begin));
+    println!("");
   }
 }
