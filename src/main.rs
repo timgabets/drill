@@ -2,7 +2,7 @@ extern crate clap;
 extern crate colored;
 extern crate csv;
 extern crate hyper;
-extern crate hyper_native_tls;
+extern crate hyper_tls;
 extern crate regex;
 extern crate serde_json;
 extern crate time;
@@ -24,31 +24,56 @@ use colored::*;
 use std::collections::HashMap;
 use std::f64;
 use std::process;
+use hyper::Client;
+use hyper::rt::{self, Future, Stream};
 
 fn main() {
-  let matches = app_args();
-  let benchmark_file = matches.value_of("benchmark").unwrap();
-  let report_path_option = matches.value_of("report");
-  let stats_option = matches.is_present("stats");
-  let compare_path_option = matches.value_of("compare");
-  let threshold_option = matches.value_of("threshold");
-  let no_check_certificate = matches.is_present("no-check-certificate");
-  let quiet = matches.is_present("quiet");
-  let nanosec = matches.is_present("nanosec");
+  rt::run(rt::lazy(|| {
+    let matches = app_args();
+    let benchmark_file = matches.value_of("benchmark").unwrap();
+    let report_path_option = matches.value_of("report");
+    let stats_option = matches.is_present("stats");
+    let compare_path_option = matches.value_of("compare");
+    let threshold_option = matches.value_of("threshold");
+    let no_check_certificate = matches.is_present("no-check-certificate");
+    let quiet = matches.is_present("quiet");
+    let nanosec = matches.is_present("nanosec");
 
-  let begin = time::precise_time_s();
-  let list_reports_result = benchmark::execute(benchmark_file, report_path_option, no_check_certificate, quiet, nanosec);
-  let duration = time::precise_time_s() - begin;
+    let client = Client::new();
+    let uri = "http://localhost:9000/api/users.json".parse().unwrap();
 
-  match list_reports_result {
-    Ok(list_reports) => {
-      show_stats(&list_reports, stats_option, nanosec, duration);
-      compare_benchmark(&list_reports, compare_path_option, threshold_option);
+    let list_reports_result = benchmark::execute(benchmark_file, report_path_option, no_check_certificate, quiet, nanosec);
 
-      process::exit(0)
+    let begin = time::precise_time_s();
+    let list_reports_result = benchmark::execute(benchmark_file, report_path_option, no_check_certificate, quiet, nanosec);
+    let duration = time::precise_time_s() - begin;
+
+    match list_reports_result {
+      Ok(list_reports) => {
+        show_stats(&list_reports, stats_option, nanosec, duration);
+        compare_benchmark(&list_reports, compare_path_option, threshold_option);
+
+        process::exit(0)
+      }
+      Err(_) => process::exit(1),
     }
-    Err(_) => process::exit(1),
-  }
+
+    client
+      .get(uri)
+      .map(|res| {
+        println!("Response: {}", res.status());
+        //let duration_ms = (time::precise_time_s() - begin) * 1000.0;
+
+        // reports.push(Report {
+        //   name: self.name.to_owned(),
+        //   duration: duration_ms,
+        //   status: res.status().as_u16(),
+        // });
+      })
+    .map_err(|err| {
+      println!("Error: {}", err);
+    })
+  }));
 }
 
 fn app_args<'a>() -> clap::ArgMatches<'a> {

@@ -1,17 +1,14 @@
 use std::collections::HashMap;
-use std::io::Read;
+// TODO: async use std::io::Read;
 
 use colored::*;
 use serde_json;
 use time;
 use yaml_rust::Yaml;
 
-use hyper::client::{Client, Response};
-use hyper::header::{Cookie, Headers, SetCookie, UserAgent};
-use hyper::method::Method;
-use hyper::net::HttpsConnector;
-use hyper_native_tls::native_tls::TlsConnector;
-use hyper_native_tls::NativeTlsClient;
+use hyper::Client;
+use hyper::Response;
+use hyper::rt::{self, Future, Stream};
 
 use crate::config;
 use crate::interpolator;
@@ -78,7 +75,7 @@ impl Request {
     }
   }
 
-  fn send_request(&self, context: &mut HashMap<String, Yaml>, responses: &mut HashMap<String, serde_json::Value>, config: &config::Config) -> (Option<Response>, f64) {
+  fn send_request(&self, context: &mut HashMap<String, Yaml>, responses: &mut HashMap<String, serde_json::Value>, config: &config::Config) -> (Option<Response<()>>, f64) {
     let begin = time::precise_time_s();
     let mut uninterpolator = None;
 
@@ -120,85 +117,107 @@ impl Request {
 
     let client = if interpolated_base_url.starts_with("https") {
       // Build a TSL connector
-      let mut connector_builder = TlsConnector::builder();
-      connector_builder.danger_accept_invalid_certs(config.no_check_certificate);
+      // let mut connector_builder = TlsConnector::builder();
+      // connector_builder.danger_accept_invalid_certs(config.no_check_certificate);
 
-      let ssl = NativeTlsClient::from(connector_builder.build().unwrap());
-      let connector = HttpsConnector::new(ssl);
+      // let ssl = NativeTlsClient::from(connector_builder.build().unwrap());
+      // let connector = HttpsConnector::new(ssl);
 
-      Client::with_connector(connector)
+      // Client::with_connector(connector)
+      Client::new()
     } else {
       Client::new()
     };
 
-    let interpolated_body;
+    // let interpolated_body;
 
     // Method
-    let method = match self.method.to_uppercase().as_ref() {
-      "GET" => Method::Get,
-      "POST" => Method::Post,
-      "PUT" => Method::Put,
-      "PATCH" => Method::Patch,
-      "DELETE" => Method::Delete,
-      "HEAD" => Method::Head,
-      _ => panic!("Unknown method '{}'", self.method),
-    };
+    // let method = match self.method.to_uppercase().as_ref() {
+    //   "GET" => Method::Get,
+    //   "POST" => Method::Post,
+    //   "PUT" => Method::Put,
+    //   "PATCH" => Method::Patch,
+    //   "DELETE" => Method::Delete,
+    //   "HEAD" => Method::Head,
+    //   _ => panic!("Unknown method '{}'", self.method),
+    // };
 
     // Resolve the body
-    let request = if let Some(body) = self.body.as_ref() {
-      interpolated_body =
-          uninterpolator
-          .get_or_insert(interpolator::Interpolator::new(context, responses))
-          .resolve(body);
+    // TODO async
+    // let request = if let Some(body) = self.body.as_ref() {
+    //   interpolated_body =
+    //       uninterpolator
+    //       .get_or_insert(interpolator::Interpolator::new(context, responses))
+    //       .resolve(body);
 
-      client.request(method, interpolated_base_url.as_str()).body(&interpolated_body)
-    } else {
-      client.request(method, interpolated_base_url.as_str())
-    };
+    //   // client.request(method, interpolated_base_url.as_str()).body(&interpolated_body)
+    //   client.request(method, interpolated_base_url.as_str())
+    // } else {
+    //   client.request(method, interpolated_base_url.as_str())
+    // };
+    //
 
-    // Headers
-    let mut headers = Headers::new();
-    headers.set(UserAgent(USER_AGENT.to_string()));
+    // let request = hyper::Request::builder()
+    //   .method(self.method.to_uppercase().as_ref())
+    //   .uri(interpolated_base_url)
+    //   .body(hyper::Body::from("Hallo!"))
+    //   .expect("request builder");
 
-    if let Some(cookie) = context.get("cookie") {
-      headers.set(Cookie(vec![String::from(cookie.as_str().unwrap())]));
-    }
+    // // Headers
+    // let mut headers = request.headers_mut();
 
-    // Resolve headers
-    for (key, val) in self.headers.iter() {
-      let interpolated_header = uninterpolator
-          .get_or_insert(interpolator::Interpolator::new(context, responses))
-          .resolve(val);
+    // headers.insert(
+    //   hyper::header::USER_AGENT,
+    //   hyper::header::HeaderValue::from_static(USER_AGENT)
+    // );
 
-      headers.set_raw(key.to_owned(), vec![interpolated_header.clone().into_bytes()]);
-    }
+    // if let Some(cookie) = context.get("cookie") {
+    //   headers.insert(
+    //     hyper::header::COOKIE,
+    //     hyper::header::HeaderValue::from_static(cookie.as_str().expect("Where is the cookie?"))
+    //   );
+    // }
 
-    let response_result = request.headers(headers).send();
-    let duration_ms = (time::precise_time_s() - begin) * 1000.0;
+    // // Resolve headers
+    // // TODO async
+    // // for (key, val) in self.headers.iter() {
+    // //   let interpolated_header = uninterpolator
+    // //       .get_or_insert(interpolator::Interpolator::new(context, responses))
+    // //       .resolve(val);
 
-    match response_result {
-      Err(e) => {
-        if !config.quiet {
-          println!("Error connecting '{}': {:?}", interpolated_base_url.as_str(), e);
-        }
-        (None, duration_ms)
-      }
-      Ok(response) => {
-        if !config.quiet {
-          let status_text = if response.status.is_server_error() {
-            response.status.to_string().red()
-          } else if response.status.is_client_error() {
-            response.status.to_string().purple()
-          } else {
-            response.status.to_string().yellow()
-          };
+    // //   headers.set_raw(key.to_owned(), vec![interpolated_header.clone().into_bytes()]);
+    // // }
 
-          println!("{:width$} {} {} {}", interpolated_name.green(), interpolated_base_url.blue().bold(), status_text, Request::format_time(duration_ms, config.nanosec).cyan(), width = 25);
-        }
+    // // let response_result = request.headers(headers).send();
+    // let future = client.request(request);
 
-        (Some(response), duration_ms)
-      }
-    }
+    // let duration_ms = (time::precise_time_s() - begin) * 1000.0;
+
+    (None, 0.0)
+    // TODO: async
+    // match response_result {
+    //   Err(e) => {
+    //     if !config.quiet {
+    //       println!("Error connecting '{}': {:?}", interpolated_base_url.as_str(), e);
+    //     }
+    //     (None, duration_ms)
+    //   }
+    //   Ok(response) => {
+    //     if !config.quiet {
+    //       let status_text = if response.status.is_server_error() {
+    //         response.status.to_string().red()
+    //       } else if response.status.is_client_error() {
+    //         response.status.to_string().purple()
+    //       } else {
+    //         response.status.to_string().yellow()
+    //       };
+
+    //       println!("{:width$} {} {} {}", interpolated_name.green(), interpolated_base_url.blue().bold(), status_text, Request::format_time(duration_ms, config.nanosec).cyan(), width = 25);
+    //     }
+
+    //     (Some(response), duration_ms)
+    //   }
+    // }
   }
 }
 
@@ -208,38 +227,61 @@ impl Runnable for Request {
       context.insert("item".to_string(), self.with_item.clone().unwrap());
     }
 
-    let (res, duration_ms) = self.send_request(context, responses, config);
+    // let (res, duration_ms) = self.send_request(context, responses, config);
 
-    match res {
-      None => reports.push(Report {
-        name: self.name.to_owned(),
-        duration: duration_ms,
-        status: 520u16,
-      }),
-      Some(mut response) => {
-        reports.push(Report {
-          name: self.name.to_owned(),
-          duration: duration_ms,
-          status: response.status.to_u16(),
-        });
+    rt::run(rt::lazy(|| {
+      let begin = time::precise_time_s();
+      let client = Client::new();
+      let uri = "http://localhost:9000/api/users.json".parse().unwrap();
 
-        if let Some(&SetCookie(ref cookies)) = response.headers.get::<SetCookie>() {
-          if let Some(cookie) = cookies.iter().next() {
-            let value = String::from(cookie.split(";").next().unwrap());
-            context.insert("cookie".to_string(), Yaml::String(value));
-          }
-        }
+      client
+        .get(uri)
+        .map(|res| {
+          println!("Response: {}", res.status());
+          //let duration_ms = (time::precise_time_s() - begin) * 1000.0;
 
-        if let Some(ref key) = self.assign {
-          let mut data = String::new();
+          // reports.push(Report {
+          //   name: self.name.to_owned(),
+          //   duration: duration_ms,
+          //   status: res.status().as_u16(),
+          // });
+        })
+      .map_err(|err| {
+        println!("Error: {}", err);
+      })
+    }));
 
-          response.read_to_string(&mut data).unwrap();
+    // TODO async
+    // match res {
+    //   None => reports.push(Report {
+    //     name: self.name.to_owned(),
+    //     duration: duration_ms,
+    //     status: 520u16,
+    //   }),
+    //   Some(mut response) => {
+    //     reports.push(Report {
+    //       name: self.name.to_owned(),
+    //       duration: duration_ms,
+    //       status: response.status().as_u16(),
+    //     });
 
-          let value: serde_json::Value = serde_json::from_str(&data).unwrap();
+    //     // if let Some(cookies) = response.headers().get("SetCookie") {
+    //     //   if let Some(cookie) = cookies.iter().next() {
+    //     //     let value = String::from(cookie.split(";").next().unwrap());
+    //     //     context.insert("cookie".to_string(), Yaml::String(value));
+    //     //   }
+    //     // }
 
-          responses.insert(key.to_owned(), value);
-        }
-      }
-    }
+    //     // if let Some(ref key) = self.assign {
+    //     //   let mut data = String::new();
+
+    //     //   response.read_to_string(&mut data).unwrap();
+
+    //     //   let value: serde_json::Value = serde_json::from_str(&data).unwrap();
+
+    //     //   responses.insert(key.to_owned(), value);
+    //     // }
+    //   }
+    // }
   }
 }
