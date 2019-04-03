@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
 use time;
-use tokio;
 
 use serde_json::Value;
 use yaml_rust::Yaml;

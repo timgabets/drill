@@ -6,7 +6,6 @@ use yaml_rust::Yaml;
 
 use crate::config;
 
-use futures::Future;
 use crate::actions::{Report, Runnable};
 
 #[derive(Clone)]

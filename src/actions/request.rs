@@ -1,24 +1,20 @@
-use std::collections::HashMap;
-// TODO: async use std::io::Read;
-
 use colored::*;
+use futures::{stream, Future, Stream};
+use hyper::{Client, Response};
+use hyper_tls::HttpsConnector;
 use serde_json;
+use std::collections::HashMap;
+use std::io::{self, Write};
 use std::iter;
+use time;
 use yaml_rust::Yaml;
 
-use futures::{stream, Future, Stream};
-use std::io::{self, Write};
-
-use hyper::Client;
-// use time;
-// use hyper::Response;
-// use crate::interpolator;
-
-use crate::config;
-
 use crate::actions::{Report, Runnable};
+use crate::config;
+use crate::interpolator;
 
 static USER_AGENT: &'static str = "drill";
+static CONCURRENCY: usize = 250;
 
 #[derive(Clone)]
 pub struct Request {
@@ -77,6 +73,138 @@ impl Request {
       tdiff.round().to_string() + "ms"
     }
   }
+
+  fn send_request(&self, context: &mut HashMap<String, Yaml>, responses: &mut HashMap<String, serde_json::Value>, config: &config::Config) -> (Option<Response>, f64) {
+    let begin = time::precise_time_s();
+    let mut uninterpolator = None;
+
+    // Resolve the name
+    let interpolated_name = if self.name.contains("{") {
+      uninterpolator.get_or_insert(interpolator::Interpolator::new(context, responses)).resolve(&self.name)
+    } else {
+      self.name.clone()
+    };
+
+    // Resolve the url
+    let interpolated_url = if self.url.contains("{") {
+      uninterpolator.get_or_insert(interpolator::Interpolator::new(context, responses)).resolve(&self.url)
+    } else {
+      self.url.clone()
+    };
+
+    // Resolve relative urls
+    let interpolated_base_url = if &interpolated_url[..1] == "/" {
+      match context.get("base") {
+        Some(value) => {
+          if let Some(vs) = value.as_str() {
+            format!("{}{}", vs.to_string(), interpolated_url)
+          } else {
+            panic!("{} Wrong type 'base' variable!", "WARNING!".yellow().bold());
+          }
+        }
+        _ => {
+          panic!("{} Unknown 'base' variable!", "WARNING!".yellow().bold());
+        }
+      }
+    } else {
+      interpolated_url
+    };
+
+    let client = if interpolated_base_url.starts_with("https") {
+      // Build a TSL connector
+      // TODO
+      // let mut connector_builder = TlsConnector::builder();
+      // connector_builder.danger_accept_invalid_certs(config.no_check_certificate);
+
+      // let ssl = NativeTlsClient::from(connector_builder.build().unwrap());
+      // let connector = HttpsConnector::new(ssl);
+
+      // Client::with_connector(connector)
+
+      let https = HttpsConnector::new(4).expect("TLS initialization failed");
+      Client::builder().build::<_, hyper::Body>(https);
+    } else {
+      Client::new()
+    };
+
+    let interpolated_body;
+
+
+    // Method
+    // let method = match self.method.to_uppercase().as_ref() {
+    //   "GET" => Method::Get,
+    //   "POST" => Method::Post,
+    //   "PUT" => Method::Put,
+    //   "PATCH" => Method::Patch,
+    //   "DELETE" => Method::Delete,
+    //   "HEAD" => Method::Head,
+    //   _ => panic!("Unknown method '{}'", self.method),
+    // };
+
+    // Resolve the body
+    let request = if let Some(body) = self.body.as_ref() {
+      interpolated_body = uninterpolator.get_or_insert(interpolator::Interpolator::new(context, responses)).resolve(body);
+
+      // client.request(method, interpolated_base_url.as_str()).body(&interpolated_body)
+
+      Request::builder()
+        .method(self.method.to_uppercase().as_ref())
+        .uri(interpolated_base_url)
+        .body(hyper::Body::from(interpolated_body))
+        .expect("request builder");
+    } else {
+      // client.request(method, interpolated_base_url.as_str())
+      Request::builder()
+        .method(self.method.to_uppercase().as_ref())
+        .uri(interpolated_base_url)
+        .expect("request builder");
+    };
+
+    // Headers
+    let mut headers = hyper::HeaderMap::new();
+    headers.insert(hyper::header::USER_AGENT, USER_AGENT);
+
+    if let Some(cookie) = context.get("cookie") {
+      headers.insert(hyper::header::COOKIE, String::from(cookie.as_str().unwrap()));
+    }
+
+    // Resolve headers
+    for (key, val) in self.headers.iter() {
+      let interpolated_header = uninterpolator.get_or_insert(interpolator::Interpolator::new(context, responses)).resolve(val);
+
+      headers.set_raw(key.to_owned(), vec![interpolated_header.clone().into_bytes()]);
+    }
+
+    let response_result = request.headers(headers).send();
+    let duration_ms = (time::precise_time_s() - begin) * 1000.0;
+
+    match response_result {
+      Err(e) => {
+        if !config.quiet {
+          println!("Error connecting '{}': {:?}", interpolated_base_url.as_str(), e);
+        }
+        (None, duration_ms)
+      }
+      Ok(response) => {
+        if !config.quiet {
+          let status_text = if response.status.is_server_error() {
+            response.status.to_string().red()
+          } else if response.status.is_client_error() {
+            response.status.to_string().purple()
+          } else {
+            response.status.to_string().yellow()
+          };
+
+          println!("{:width$} {} {} {}", interpolated_name.green(), interpolated_base_url.blue().bold(), status_text, Request::format_time(duration_ms, config.nanosec).cyan(), width = 25);
+        }
+
+        (Some(response), duration_ms)
+      }
+    }
+
+    // FIXME
+    (None, 100)
+  }
 }
 
 impl Runnable for Request {
@@ -85,17 +213,51 @@ impl Runnable for Request {
       context.insert("item".to_string(), self.with_item.clone().unwrap());
     }
 
-    // tokio::run(move || {
-    //   let client = Client::new();
-    //   let uri = "http://localhost:9000/api/users.json".parse().unwrap();
+    let (res, duration_ms) = self.send_request(context, responses, config);
 
-    //   client
-    //     .get(uri)
-    //     .map(move |_res| {})
-    //     .map_err(|err| {
-    //       println!("Error: {}", err);
-    //     })
-    // });
+    let client = Client::new();
+    let uri = "http://localhost:9000/api/users.json".parse().unwrap();
+
+    let work = client
+      .get(uri)
+      .map(move |_res| {})
+      .map_err(|err| {
+        println!("Error: {}", err);
+      });
+
+    tokio::run(work);
+
+    match res {
+      None => reports.push(Report {
+        name: self.name.to_owned(),
+        duration: duration_ms,
+        status: 520u16,
+      }),
+      Some(mut response) => {
+        reports.push(Report {
+          name: self.name.to_owned(),
+          duration: duration_ms,
+          status: response.status.to_u16(),
+        });
+
+        if let Some(cookies) = response.headers().get(hyper::header::SET_COOKIE) {
+          if let Some(cookie) = cookies.iter().next() {
+            let value = String::from(cookie.split(";").next().unwrap());
+            context.insert("cookie".to_string(), Yaml::String(value));
+          }
+        }
+
+        if let Some(ref key) = self.assign {
+          let mut data = String::new();
+
+          response.read_to_string(&mut data).unwrap();
+
+          let value: serde_json::Value = serde_json::from_str(&data).unwrap();
+
+          responses.insert(key.to_owned(), value);
+        }
+      }
+    }
   }
 
   fn has_interpolations(&self) -> bool {
@@ -114,20 +276,23 @@ impl Runnable for Request {
     let uris = iter::repeat(uri).take(iterations);
 
     let work = stream::iter_ok(uris)
-        .map(move |uri| client.get(uri))
-        .buffer_unordered(250)
-        .and_then(|res| {
-            println!("Response: {}", res.status());
-            res.into_body()
-                .concat2()
-                .map_err(|e| panic!("Error collecting body: {}", e))
-        })
-        .for_each(|body| {
-            io::stdout()
-                .write_all(&body)
-                .map_err(|e| panic!("Error writing: {}", e))
-        })
-        .map_err(|e| panic!("Error making request: {}", e));
+      .map(move |uri| client.get(uri))
+      .buffer_unordered(CONCURRENCY)
+      .and_then(|res| {
+        println!("Response: {}", res.status());
+        res.into_body()
+          .concat2()
+          .map_err(|e| panic!("Error collecting body: {}", e))
+      })
+    .for_each(|body| {
+      io::stdout()
+        .write_all(&body)
+        .map_err(|e| panic!("Error writing: {}", e))
+    })
+    .map_err(|e| panic!("Error making request: {}", e));
+
+    // let resp = Response::new().with_status(StatusCode::NotFound);
+    // futures::future::ok(resp);
 
     tokio::run(work);
   }
