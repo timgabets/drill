@@ -14,6 +14,7 @@ app.use(session({
   saveUninitialized: false
 }));
 
+
 const handler = function(req, res) {
   setTimeout(function () {
     const filename = path.join(__dirname, 'responses', req.path)
@@ -22,7 +23,7 @@ const handler = function(req, res) {
         res.status(404);
         res.end();
       } else {
-        process.stdout.write(".");
+        process.stdout.write(req.path.slice(-1).toUpperCase());
         res.write(data);
         res.end();
       }
