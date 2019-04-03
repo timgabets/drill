@@ -22,6 +22,7 @@ const handler = function(req, res) {
         res.status(404);
         res.end();
       } else {
+        process.stdout.write(".");
         res.write(data);
         res.end();
       }

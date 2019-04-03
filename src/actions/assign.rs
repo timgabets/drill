@@ -34,7 +34,11 @@ impl Runnable for Assign {
     if !_config.quiet {
       println!("{:width$} {}={}", self.name.green(), self.key.cyan().bold(), self.value.magenta(), width = 25);
     }
-
+    // TODO: Should we interpolate the value?
     context.insert(self.key.to_owned(), Yaml::String(self.value.to_owned()));
+  }
+
+  fn has_interpolations(&self) -> bool {
+    self.name.contains("{") || self.value.contains("{")
   }
 }

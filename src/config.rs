@@ -14,10 +14,11 @@ pub struct Config {
   pub rampup: i64,
   pub quiet: bool,
   pub nanosec: bool,
+  pub throughput: bool,
 }
 
 impl Config {
-  pub fn new(path: &str, no_check_certificate: bool, quiet: bool, nanosec: bool) -> Config {
+  pub fn new(path: &str, no_check_certificate: bool, quiet: bool, nanosec: bool, throughput: bool) -> Config {
     let config_file = reader::read_file(path);
 
     let config_docs = YamlLoader::load_from_str(config_file.as_str()).unwrap();
@@ -36,6 +37,7 @@ impl Config {
       rampup: rampup,
       quiet: quiet,
       nanosec: nanosec,
+      throughput: throughput,
     }
   }
 }

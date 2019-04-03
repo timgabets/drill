@@ -24,56 +24,39 @@ use colored::*;
 use std::collections::HashMap;
 use std::f64;
 use std::process;
-use hyper::Client;
-use hyper::rt::{self, Future, Stream};
 
 fn main() {
-  rt::run(rt::lazy(|| {
-    let matches = app_args();
-    let benchmark_file = matches.value_of("benchmark").unwrap();
-    let report_path_option = matches.value_of("report");
-    let stats_option = matches.is_present("stats");
-    let compare_path_option = matches.value_of("compare");
-    let threshold_option = matches.value_of("threshold");
-    let no_check_certificate = matches.is_present("no-check-certificate");
-    let quiet = matches.is_present("quiet");
-    let nanosec = matches.is_present("nanosec");
+  let matches = app_args();
+  let benchmark_file = matches.value_of("benchmark").unwrap();
+  let report_path_option = matches.value_of("report");
+  let stats_option = matches.is_present("stats");
+  let compare_path_option = matches.value_of("compare");
+  let threshold_option = matches.value_of("threshold");
+  let throughput = matches.is_present("throughput");
+  let no_check_certificate = matches.is_present("no-check-certificate");
+  let quiet = matches.is_present("quiet");
+  let nanosec = matches.is_present("nanosec");
 
-    let client = Client::new();
-    let uri = "http://localhost:9000/api/users.json".parse().unwrap();
+  let begin = time::precise_time_s();
+  let list_reports_result = benchmark::execute(
+      benchmark_file,
+      report_path_option,
+      no_check_certificate,
+      quiet,
+      nanosec,
+      throughput
+  );
+  let duration = time::precise_time_s() - begin;
 
-    let list_reports_result = benchmark::execute(benchmark_file, report_path_option, no_check_certificate, quiet, nanosec);
+  match list_reports_result {
+    Ok(list_reports) => {
+      show_stats(&list_reports, stats_option, nanosec, duration);
+      compare_benchmark(&list_reports, compare_path_option, threshold_option);
 
-    let begin = time::precise_time_s();
-    let list_reports_result = benchmark::execute(benchmark_file, report_path_option, no_check_certificate, quiet, nanosec);
-    let duration = time::precise_time_s() - begin;
-
-    match list_reports_result {
-      Ok(list_reports) => {
-        show_stats(&list_reports, stats_option, nanosec, duration);
-        compare_benchmark(&list_reports, compare_path_option, threshold_option);
-
-        process::exit(0)
-      }
-      Err(_) => process::exit(1),
+      process::exit(0)
     }
-
-    client
-      .get(uri)
-      .map(|res| {
-        println!("Response: {}", res.status());
-        //let duration_ms = (time::precise_time_s() - begin) * 1000.0;
-
-        // reports.push(Report {
-        //   name: self.name.to_owned(),
-        //   duration: duration_ms,
-        //   status: res.status().as_u16(),
-        // });
-      })
-    .map_err(|err| {
-      println!("Error: {}", err);
-    })
-  }));
+    Err(_) => process::exit(1),
+  }
 }
 
 fn app_args<'a>() -> clap::ArgMatches<'a> {
@@ -85,6 +68,7 @@ fn app_args<'a>() -> clap::ArgMatches<'a> {
     .arg(Arg::with_name("report").short("r").long("report").help("Sets a report file").takes_value(true).conflicts_with("compare"))
     .arg(Arg::with_name("compare").short("c").long("compare").help("Sets a compare file").takes_value(true).conflicts_with("report"))
     .arg(Arg::with_name("threshold").short("t").long("threshold").help("Sets a threshold value in ms amongst the compared file").takes_value(true).conflicts_with("report"))
+    .arg(Arg::with_name("throughput").short("x").long("thoughput").help("Executes the plan at maximum throughput. Interpolations, sessions and request dependencies are not allowed in this mode").takes_value(false))
     .arg(Arg::with_name("no-check-certificate").long("no-check-certificate").help("Disables SSL certification check. (Not recommended)").takes_value(false))
     .arg(Arg::with_name("quiet").short("q").long("quiet").help("Disables output").takes_value(false))
     .arg(Arg::with_name("nanosec").short("n").long("nanosec").help("Shows statistics in nanoseconds").takes_value(false))

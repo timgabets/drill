@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
-use std::time;
+use time;
 
 use serde_json::Value;
 use yaml_rust::Yaml;
@@ -15,11 +15,20 @@ use colored::*;
 
 fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<config::Config>, thread: i64) -> Vec<Report> {
   let delay = config.rampup / config.threads;
-  thread::sleep(time::Duration::new((delay * thread) as u64, 0));
+  thread::sleep(std::time::Duration::new((delay * thread) as u64, 0));
 
   let mut global_reports = Vec::new();
 
-  for iteration in 0..config.iterations {
+  if config.throughput {
+    println!("At maximum throughput!!!!!!!!!!!!!!!!!!!");
+
+    if benchmark.iter().any(|item| item.has_interpolations()) {
+      panic!("Throughput mode incompatible with interpolations!");
+    }
+  }
+
+  let begin = time::precise_time_s();
+  for iteration in 1..config.iterations {
     let mut responses: HashMap<String, Value> = HashMap::new();
     let mut context: HashMap<String, Yaml> = HashMap::new();
     let mut reports: Vec<Report> = Vec::new();
@@ -35,6 +44,8 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
     global_reports.push(reports);
   }
 
+  println!("Total: {}ns", (time::precise_time_s() - begin.clone()) * 1000.0);
+
   global_reports.concat()
 }
 
@@ -44,8 +55,8 @@ fn join<S: ToString>(l: Vec<S>, sep: &str) -> String {
                   )
 }
 
-pub fn execute(benchmark_path: &str, report_path_option: Option<&str>, no_check_certificate: bool, quiet: bool, nanosec: bool) -> Result<Vec<Vec<Report>>, Vec<Vec<Report>>> {
-  let config = Arc::new(config::Config::new(benchmark_path, no_check_certificate, quiet, nanosec));
+pub fn execute(benchmark_path: &str, report_path_option: Option<&str>, no_check_certificate: bool, quiet: bool, nanosec: bool, throughput: bool) -> Result<Vec<Vec<Report>>, Vec<Vec<Report>>> {
+  let config = Arc::new(config::Config::new(benchmark_path, no_check_certificate, quiet, nanosec, throughput));
 
   if report_path_option.is_some() {
     println!("{}: {}. Ignoring {} and {} properties...", "Report mode".yellow(), "on".purple(), "threads".yellow(), "iterations".yellow());
