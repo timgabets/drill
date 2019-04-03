@@ -74,7 +74,7 @@ impl Request {
     }
   }
 
-  fn send_request(&self, context: &mut HashMap<String, Yaml>, responses: &mut HashMap<String, serde_json::Value>, config: &config::Config) -> (Option<Response>, f64) {
+  fn send_request(&self, context: &mut HashMap<String, Yaml>, responses: &mut HashMap<String, serde_json::Value>, config: &config::Config) -> (Option<Response<()>>, f64) {
     let begin = time::precise_time_s();
     let mut uninterpolator = None;
 
@@ -122,9 +122,13 @@ impl Request {
       // Client::with_connector(connector)
 
       let https = HttpsConnector::new(4).expect("TLS initialization failed");
-      Client::builder().build::<_, hyper::Body>(https);
+      Client::builder().build::<_, hyper::Body>(https)
     } else {
-      Client::new()
+      Client::new();
+
+      // FIXME
+      let https = HttpsConnector::new(4).expect("TLS initialization failed");
+      Client::builder().build::<_, hyper::Body>(https)
     };
 
     let interpolated_body;
@@ -142,68 +146,70 @@ impl Request {
     // };
 
     // Resolve the body
-    let request = if let Some(body) = self.body.as_ref() {
+    let mut request = if let Some(body) = self.body.as_ref() {
       interpolated_body = uninterpolator.get_or_insert(interpolator::Interpolator::new(context, responses)).resolve(body);
 
       // client.request(method, interpolated_base_url.as_str()).body(&interpolated_body)
 
-      Request::builder()
-        .method(self.method.to_uppercase().as_ref())
+      hyper::Request::builder()
+        .method(self.method.to_uppercase().as_str())
         .uri(interpolated_base_url)
         .body(hyper::Body::from(interpolated_body))
-        .expect("request builder");
+        .expect("request builder with body")
     } else {
       // client.request(method, interpolated_base_url.as_str())
-      Request::builder()
-        .method(self.method.to_uppercase().as_ref())
+      hyper::Request::builder()
+        .method(self.method.to_uppercase().as_str())
         .uri(interpolated_base_url)
-        .expect("request builder");
+        .body(hyper::Body::from(""))
+        .expect("request builder without body")
     };
 
     // Headers
-    let mut headers = hyper::HeaderMap::new();
-    headers.insert(hyper::header::USER_AGENT, USER_AGENT);
+    let headers = request.headers_mut();
+    headers.insert(hyper::header::USER_AGENT, USER_AGENT.parse().unwrap());
 
     if let Some(cookie) = context.get("cookie") {
-      headers.insert(hyper::header::COOKIE, String::from(cookie.as_str().unwrap()));
+      headers.insert(hyper::header::COOKIE, cookie.as_str().unwrap().parse().unwrap());
     }
 
     // Resolve headers
     for (key, val) in self.headers.iter() {
       let interpolated_header = uninterpolator.get_or_insert(interpolator::Interpolator::new(context, responses)).resolve(val);
 
-      headers.set_raw(key.to_owned(), vec![interpolated_header.clone().into_bytes()]);
+      let header_name = hyper::header::HeaderName::from_lowercase(key.to_lowercase().as_bytes()).unwrap();
+      headers.insert(header_name, interpolated_header.parse().unwrap());
     }
 
-    let response_result = request.headers(headers).send();
-    let duration_ms = (time::precise_time_s() - begin) * 1000.0;
+    let _response_result = client.request(request);
+    let _duration_ms = (time::precise_time_s() - begin) * 1000.0;
 
-    match response_result {
-      Err(e) => {
-        if !config.quiet {
-          println!("Error connecting '{}': {:?}", interpolated_base_url.as_str(), e);
-        }
-        (None, duration_ms)
-      }
-      Ok(response) => {
-        if !config.quiet {
-          let status_text = if response.status.is_server_error() {
-            response.status.to_string().red()
-          } else if response.status.is_client_error() {
-            response.status.to_string().purple()
-          } else {
-            response.status.to_string().yellow()
-          };
+    // match response_result {
+    //   Err(e) => {
+    //     if !config.quiet {
+    //       println!("Error connecting '{}': {:?}", interpolated_base_url.as_str(), e);
+    //     }
+    //     (None, duration_ms)
+    //   }
+    //   Ok(response) => {
+    //     if !config.quiet {
+    //       let status_text = if response.status().is_server_error() {
+    //         response.status().to_string().red()
+    //       } else if response.status().is_client_error() {
+    //         response.status().to_string().purple()
+    //       } else {
+    //         response.status().to_string().yellow()
+    //       };
 
-          println!("{:width$} {} {} {}", interpolated_name.green(), interpolated_base_url.blue().bold(), status_text, Request::format_time(duration_ms, config.nanosec).cyan(), width = 25);
-        }
+    //       println!("{:width$} {} {} {}", interpolated_name.green(), interpolated_base_url.blue().bold(), status_text, Request::format_time(duration_ms, config.nanosec).cyan(), width = 25);
+    //     }
 
-        (Some(response), duration_ms)
-      }
-    }
+    //     (Some(response), duration_ms)
+    //   }
+    // }
 
     // FIXME
-    (None, 100)
+    (None, 100.0)
   }
 }
 
@@ -237,20 +243,20 @@ impl Runnable for Request {
         reports.push(Report {
           name: self.name.to_owned(),
           duration: duration_ms,
-          status: response.status.to_u16(),
+          status: response.status().as_u16(),
         });
 
-        if let Some(cookies) = response.headers().get(hyper::header::SET_COOKIE) {
-          if let Some(cookie) = cookies.iter().next() {
-            let value = String::from(cookie.split(";").next().unwrap());
-            context.insert("cookie".to_string(), Yaml::String(value));
-          }
+        if let Some(cookie) = response.headers().get(hyper::header::SET_COOKIE) {
+          let value = String::from(cookie.to_str().unwrap().split(";").next().unwrap());
+          context.insert("cookie".to_string(), Yaml::String(value));
         }
 
         if let Some(ref key) = self.assign {
           let mut data = String::new();
 
-          response.read_to_string(&mut data).unwrap();
+          // TODO:
+          // response.read_to_string(&mut data).unwrap();
+          let data = "YOLO";
 
           let value: serde_json::Value = serde_json::from_str(&data).unwrap();
 
