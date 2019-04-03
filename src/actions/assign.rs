@@ -6,6 +6,7 @@ use yaml_rust::Yaml;
 
 use crate::config;
 
+use futures::Future;
 use crate::actions::{Report, Runnable};
 
 #[derive(Clone)]
@@ -40,5 +41,9 @@ impl Runnable for Assign {
 
   fn has_interpolations(&self) -> bool {
     self.name.contains("{") || self.value.contains("{")
+  }
+
+  fn extreme(&self, iterations: usize) {
+    // Do nothing
   }
 }

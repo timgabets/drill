@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
 use time;
+use tokio;
 
 use serde_json::Value;
 use yaml_rust::Yaml;
@@ -19,29 +20,35 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
 
   let mut global_reports = Vec::new();
 
+  let begin = time::precise_time_s();
+
   if config.throughput {
     println!("At maximum throughput!!!!!!!!!!!!!!!!!!!");
 
     if benchmark.iter().any(|item| item.has_interpolations()) {
       panic!("Throughput mode incompatible with interpolations!");
     }
-  }
 
-  let begin = time::precise_time_s();
-  for iteration in 1..config.iterations {
-    let mut responses: HashMap<String, Value> = HashMap::new();
-    let mut context: HashMap<String, Yaml> = HashMap::new();
-    let mut reports: Vec<Report> = Vec::new();
-
-    context.insert("iteration".to_string(), Yaml::String(iteration.to_string()));
-    context.insert("thread".to_string(), Yaml::String(thread.to_string()));
-    context.insert("base".to_string(), Yaml::String(config.base.to_string()));
-
+    // TODO: Zip items instead of blocks
     for item in benchmark.iter() {
-      item.execute(&mut context, &mut responses, &mut reports, &config);
+      item.extreme(config.iterations as usize);
     }
+  } else {
+    for iteration in 1..config.iterations {
+      let mut responses: HashMap<String, Value> = HashMap::new();
+      let mut context: HashMap<String, Yaml> = HashMap::new();
+      let mut reports: Vec<Report> = Vec::new();
 
-    global_reports.push(reports);
+      context.insert("iteration".to_string(), Yaml::String(iteration.to_string()));
+      context.insert("thread".to_string(), Yaml::String(thread.to_string()));
+      context.insert("base".to_string(), Yaml::String(config.base.to_string()));
+
+      for item in benchmark.iter() {
+        item.execute(&mut context, &mut responses, &mut reports, &config);
+      }
+
+      global_reports.push(reports);
+    }
   }
 
   println!("Total: {}ns", (time::precise_time_s() - begin.clone()) * 1000.0);

@@ -3,15 +3,18 @@ use std::collections::HashMap;
 
 use colored::*;
 use serde_json;
-use time;
+use std::iter;
 use yaml_rust::Yaml;
 
+use futures::{stream, Future, Stream};
+use std::io::{self, Write};
+
 use hyper::Client;
-use hyper::Response;
-use hyper::rt::{self, Future, Stream};
+// use time;
+// use hyper::Response;
+// use crate::interpolator;
 
 use crate::config;
-use crate::interpolator;
 
 use crate::actions::{Report, Runnable};
 
@@ -82,17 +85,17 @@ impl Runnable for Request {
       context.insert("item".to_string(), self.with_item.clone().unwrap());
     }
 
-    rt::run(rt::lazy(move || {
-      let client = Client::new();
-      let uri = "http://localhost:9000/api/users.json".parse().unwrap();
+    // tokio::run(move || {
+    //   let client = Client::new();
+    //   let uri = "http://localhost:9000/api/users.json".parse().unwrap();
 
-      client
-        .get(uri)
-        .map(move |_res| {})
-        .map_err(|err| {
-          println!("Error: {}", err);
-        })
-    }));
+    //   client
+    //     .get(uri)
+    //     .map(move |_res| {})
+    //     .map_err(|err| {
+    //       println!("Error: {}", err);
+    //     })
+    // });
   }
 
   fn has_interpolations(&self) -> bool {
@@ -102,5 +105,30 @@ impl Runnable for Request {
       self.with_item.is_some() ||
       self.assign.is_some() ||
       false // TODO: headers
+  }
+
+  fn extreme(&self, iterations: usize) {
+    let absolute_url = format!("http://localhost:9000{}", self.url);
+    let client = Client::new();
+    let uri = absolute_url.parse().unwrap();
+    let uris = iter::repeat(uri).take(iterations);
+
+    let work = stream::iter_ok(uris)
+        .map(move |uri| client.get(uri))
+        .buffer_unordered(250)
+        .and_then(|res| {
+            println!("Response: {}", res.status());
+            res.into_body()
+                .concat2()
+                .map_err(|e| panic!("Error collecting body: {}", e))
+        })
+        .for_each(|body| {
+            io::stdout()
+                .write_all(&body)
+                .map_err(|e| panic!("Error writing: {}", e))
+        })
+        .map_err(|e| panic!("Error making request: {}", e));
+
+    tokio::run(work);
   }
 }
