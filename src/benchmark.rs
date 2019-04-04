@@ -22,16 +22,24 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
   let begin = time::precise_time_s();
 
   if config.throughput {
-    println!("At maximum throughput!!!!!!!!!!!!!!!!!!!");
-
-    if benchmark.iter().any(|item| item.has_interpolations()) {
-      panic!("Throughput mode incompatible with interpolations!");
-    }
-
     // TODO: Zip items instead of blocks
     for item in benchmark.iter() {
       item.extreme(config.iterations as usize);
     }
+
+    // let uri2 = absolute_url.parse().unwrap();
+    // let _f1 = client
+    //   .get(uri2)
+    //   .map_err(|_res| {
+    //   });
+
+    // let _f2 = client
+    //   .get("http://localhost:9000/api/comments.json".parse().unwrap())
+    //   .and_then(|res| {
+    //     res.into_body().concat2()
+    //   });
+
+
   } else {
     for iteration in 1..config.iterations {
       let mut responses: HashMap<String, Value> = HashMap::new();
@@ -78,6 +86,10 @@ pub fn execute(benchmark_path: &str, report_path_option: Option<&str>, no_check_
   let mut list: Vec<Box<(Runnable + Sync + Send)>> = Vec::new();
 
   include::expand_from_filepath(benchmark_path, &mut list, Some("plan"));
+
+  if config.throughput && list.iter().any(|item| item.has_interpolations()) {
+    panic!("Throughput mode incompatible with interpolations!");
+  }
 
   let list_arc = Arc::new(list);
   let mut children = vec![];
