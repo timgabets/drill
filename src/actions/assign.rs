@@ -5,7 +5,7 @@ use serde_json::Value;
 use yaml_rust::Yaml;
 
 use crate::config;
-
+use crate::interpolator::Interpolator;
 use crate::actions::{Report, Runnable};
 
 #[derive(Clone)]
@@ -39,7 +39,8 @@ impl Runnable for Assign {
   }
 
   fn has_interpolations(&self) -> bool {
-    self.name.contains("{") || self.value.contains("{")
+    Interpolator::has_interpolations(&self.name) ||
+    Interpolator::has_interpolations(&self.value)
   }
 
   fn extreme(&self, iterations: usize) {
