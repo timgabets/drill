@@ -11,7 +11,7 @@ use yaml_rust::Yaml;
 
 use crate::actions::{Report, Runnable};
 use crate::config;
-use crate::interpolator;
+use crate::interpolator::Interpolator;
 
 static USER_AGENT: &'static str = "drill";
 static CONCURRENCY: usize = 250;
@@ -84,14 +84,14 @@ impl Request {
 
     // Resolve the name
     let interpolated_name = if self.name.contains("{") {
-      uninterpolator.get_or_insert(interpolator::Interpolator::new(context, responses)).resolve(&self.name)
+      uninterpolator.get_or_insert(Interpolator::new(context, responses)).resolve(&self.name)
     } else {
       self.name.clone()
     };
 
     // Resolve the url
     let interpolated_url = if self.url.contains("{") {
-      uninterpolator.get_or_insert(interpolator::Interpolator::new(context, responses)).resolve(&self.url)
+      uninterpolator.get_or_insert(Interpolator::new(context, responses)).resolve(&self.url)
     } else {
       self.url.clone()
     };
@@ -139,7 +139,7 @@ impl Request {
 
     // Resolve the body
     let mut request = if let Some(body) = self.body.as_ref() {
-      interpolated_body = uninterpolator.get_or_insert(interpolator::Interpolator::new(context, responses)).resolve(body);
+      interpolated_body = uninterpolator.get_or_insert(Interpolator::new(context, responses)).resolve(body);
 
       // client.request(method, interpolated_base_url.as_str()).body(&interpolated_body)
 
@@ -167,7 +167,7 @@ impl Request {
 
     // Resolve headers
     for (key, val) in self.headers.iter() {
-      let interpolated_header = uninterpolator.get_or_insert(interpolator::Interpolator::new(context, responses)).resolve(val);
+      let interpolated_header = uninterpolator.get_or_insert(Interpolator::new(context, responses)).resolve(val);
 
       let header_name = hyper::header::HeaderName::from_lowercase(key.to_lowercase().as_bytes()).unwrap();
       headers.insert(header_name, interpolated_header.parse().unwrap());
@@ -237,9 +237,9 @@ impl Runnable for Request {
   }
 
   fn has_interpolations(&self) -> bool {
-    self.name.contains("{") ||
-      self.url.contains("{") ||
-      self.body.clone().unwrap_or("".to_string()).contains("{") ||
+    Interpolator::has_interpolations(&self.name) ||
+    Interpolator::has_interpolations(&self.url) ||
+    Interpolator::has_interpolations(&self.body.clone().unwrap_or("".to_string())) ||
       self.with_item.is_some() ||
       self.assign.is_some() ||
       false // TODO: headers

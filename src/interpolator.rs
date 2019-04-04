@@ -29,6 +29,10 @@ impl<'a> Interpolator<'a> {
     }
   }
 
+  pub fn has_interpolations(_text: &String) -> bool {
+    false
+  }
+
   pub fn resolve(&self, url: &String) -> String {
     self.regexp.replace_all(url.as_str(), |caps: &Captures| {
       let capture = &caps[1];
