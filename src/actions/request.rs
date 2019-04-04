@@ -74,7 +74,11 @@ impl Request {
     }
   }
 
-  fn send_request(&self, context: &mut HashMap<String, Yaml>, responses: &mut HashMap<String, serde_json::Value>, config: &config::Config) -> (Option<Response<()>>, f64) {
+  fn send_request(&self, context: &mut HashMap<String, Yaml>, responses: &mut HashMap<String, serde_json::Value>, reports: &mut Vec<Report>, config: &config::Config) {
+    if self.with_item.is_some() {
+      context.insert("item".to_string(), self.with_item.clone().unwrap());
+    }
+
     let begin = time::precise_time_s();
     let mut uninterpolator = None;
 
@@ -133,18 +137,6 @@ impl Request {
 
     let interpolated_body;
 
-
-    // Method
-    // let method = match self.method.to_uppercase().as_ref() {
-    //   "GET" => Method::Get,
-    //   "POST" => Method::Post,
-    //   "PUT" => Method::Put,
-    //   "PATCH" => Method::Patch,
-    //   "DELETE" => Method::Delete,
-    //   "HEAD" => Method::Head,
-    //   _ => panic!("Unknown method '{}'", self.method),
-    // };
-
     // Resolve the body
     let mut request = if let Some(body) = self.body.as_ref() {
       interpolated_body = uninterpolator.get_or_insert(interpolator::Interpolator::new(context, responses)).resolve(body);
@@ -181,65 +173,24 @@ impl Request {
       headers.insert(header_name, interpolated_header.parse().unwrap());
     }
 
-    let _response_result = client.request(request);
-    let _duration_ms = (time::precise_time_s() - begin) * 1000.0;
+    client
+      .request(request)
+      .map(move |response| {
+        let duration_ms = (time::precise_time_s() - begin) * 1000.0;
 
-    // match response_result {
-    //   Err(e) => {
-    //     if !config.quiet {
-    //       println!("Error connecting '{}': {:?}", interpolated_base_url.as_str(), e);
-    //     }
-    //     (None, duration_ms)
-    //   }
-    //   Ok(response) => {
-    //     if !config.quiet {
-    //       let status_text = if response.status().is_server_error() {
-    //         response.status().to_string().red()
-    //       } else if response.status().is_client_error() {
-    //         response.status().to_string().purple()
-    //       } else {
-    //         response.status().to_string().yellow()
-    //       };
+        if !config.quiet {
+          let message = response.status().to_string();
+          let _status_text = if response.status().is_server_error() {
+            message.red()
+          } else if response.status().is_client_error() {
+            message.purple()
+          } else {
+            message.yellow()
+          };
 
-    //       println!("{:width$} {} {} {}", interpolated_name.green(), interpolated_base_url.blue().bold(), status_text, Request::format_time(duration_ms, config.nanosec).cyan(), width = 25);
-    //     }
+          // TODO: println!("{:width$} {} {} {}", interpolated_name.green(), interpolated_base_url.blue().bold(), status_text, Request::format_time(duration_ms, config.nanosec).cyan(), width = 25);
+        }
 
-    //     (Some(response), duration_ms)
-    //   }
-    // }
-
-    // FIXME
-    (None, 100.0)
-  }
-}
-
-impl Runnable for Request {
-  fn execute(&self, context: &mut HashMap<String, Yaml>, responses: &mut HashMap<String, serde_json::Value>, reports: &mut Vec<Report>, config: &config::Config) {
-    if self.with_item.is_some() {
-      context.insert("item".to_string(), self.with_item.clone().unwrap());
-    }
-
-    let (res, duration_ms) = self.send_request(context, responses, config);
-
-    let client = Client::new();
-    let uri = "http://localhost:9000/api/users.json".parse().unwrap();
-
-    let work = client
-      .get(uri)
-      .map(move |_res| {})
-      .map_err(|err| {
-        println!("Error: {}", err);
-      });
-
-    tokio::run(work);
-
-    match res {
-      None => reports.push(Report {
-        name: self.name.to_owned(),
-        duration: duration_ms,
-        status: 520u16,
-      }),
-      Some(mut response) => {
         reports.push(Report {
           name: self.name.to_owned(),
           duration: duration_ms,
@@ -252,7 +203,7 @@ impl Runnable for Request {
         }
 
         if let Some(ref key) = self.assign {
-          let mut data = String::new();
+          // let data = String::new();
 
           // TODO:
           // response.read_to_string(&mut data).unwrap();
@@ -262,8 +213,27 @@ impl Runnable for Request {
 
           responses.insert(key.to_owned(), value);
         }
-      }
-    }
+      })
+      .map_err(|_err| {
+        let _duration_ms = (time::precise_time_s() - begin) * 1000.0;
+
+        if !config.quiet {
+          // TODO: println!("Error connecting '{}': {:?}", &interpolated_base_url.clone().as_str(), err);
+        }
+
+        // TODO
+        // reports.push(Report {
+        //   name: self.name.to_owned(),
+        //   duration: duration_ms,
+        //   status: 520u16,
+        // });
+      });
+  }
+}
+
+impl Runnable for Request {
+  fn execute(&self, context: &mut HashMap<String, Yaml>, responses: &mut HashMap<String, serde_json::Value>, reports: &mut Vec<Report>, config: &config::Config) {
+    self.send_request(context, responses, reports, config);
   }
 
   fn has_interpolations(&self) -> bool {
