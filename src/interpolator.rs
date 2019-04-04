@@ -29,8 +29,8 @@ impl<'a> Interpolator<'a> {
     }
   }
 
-  pub fn has_interpolations(_text: &String) -> bool {
-    false
+  pub fn has_interpolations(text: &String) -> bool {
+    text.contains(INTERPOLATION_SUFFIX)
   }
 
   pub fn resolve(&self, url: &String) -> String {
