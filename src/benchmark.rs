@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::thread;
 use time;
 
+use futures::future::Future;
 use serde_json::Value;
 use yaml_rust::Yaml;
 
@@ -23,9 +24,9 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
 
   if config.throughput {
     // TODO: Zip items instead of blocks
-    for item in benchmark.iter() {
-      item.extreme(config.iterations as usize);
-    }
+    // for item in benchmark.iter() {
+    //   item.extreme(config.iterations as usize);
+    // }
 
     // let uri2 = absolute_url.parse().unwrap();
     // let _f1 = client
@@ -38,7 +39,27 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
     //   .and_then(|res| {
     //     res.into_body().concat2()
     //   });
+    let client = hyper::Client::new();
+    let f1 = client
+      .get("http://localhost:9000/api/users.json".parse().unwrap())
+      .and_then(|resp| {
+        println!("Status: {}", resp.status());
+        Ok(())
+      });
+      // .map_err(|so| {
 
+      // });
+    let f2 = client
+      .get("http://localhost:9000/api/organizations".parse().unwrap())
+      .and_then(|_resp| {
+        f1
+      })
+      .map_err(|err| {
+        println!("Error: {}", err);
+      });
+
+
+      tokio::run(f2);
 
   } else {
     for iteration in 1..config.iterations {

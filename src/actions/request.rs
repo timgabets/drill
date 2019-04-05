@@ -165,7 +165,7 @@ impl Request {
       headers.insert(header_name, interpolated_header.parse().unwrap());
     }
 
-    client
+    let foo = client
       .request(request)
       .map(move |response| {
         let duration_ms = (time::precise_time_s() - begin) * 1000.0;
