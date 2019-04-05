@@ -15,6 +15,7 @@ pub trait Runnable {
   fn execute(&self, context: &mut HashMap<String, Yaml>, responses: &mut HashMap<String, Value>, reports: &mut Vec<Report>, config: &config::Config);
   fn has_interpolations(&self) -> bool;
   fn extreme(&self, iterations: usize);
+  fn future(&self) -> futures::Future<Item=(), Error=()>;
 }
 
 #[derive(Clone)]

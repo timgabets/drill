@@ -4,6 +4,8 @@ use colored::*;
 use serde_json::Value;
 use yaml_rust::Yaml;
 
+use futures::{Future, Stream};
+
 use crate::config;
 use crate::interpolator::Interpolator;
 use crate::actions::{Report, Runnable};
@@ -45,5 +47,16 @@ impl Runnable for Assign {
 
   fn extreme(&self, iterations: usize) {
     // Do nothing
+  }
+
+  fn future(&self) -> futures::Future<Item=(), Error=()> {
+    let client = hyper::Client::new();
+
+    client
+      .get("http://localhost:9000/api/organizations".parse().unwrap())
+      .and_then(|res| {
+        res.into_body().concat2()
+      })
+      .map_err(|_res| {})
   }
 }

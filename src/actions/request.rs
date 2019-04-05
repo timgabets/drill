@@ -264,4 +264,8 @@ impl Runnable for Request {
 
     tokio::run(work);
   }
+
+  fn future(&self) -> futures::Future<Item=(), Error=()> {
+    Ok(())
+  }
 }

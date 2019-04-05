@@ -7,7 +7,6 @@ use time;
 use futures::{stream, Future, Stream};
 use serde_json::Value;
 use yaml_rust::Yaml;
-use std::io::{self, Write};
 
 use crate::actions::{Report, Runnable};
 use crate::config;
@@ -52,6 +51,9 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
         //     println!("Status: {}", resp.status());
         //     futures::future::ok(())
         //   });
+        for item in benchmark.iter() {
+          item.future();
+        }
 
         let f2 = client
           .get("http://localhost:9000/api/organizations".parse().unwrap())
