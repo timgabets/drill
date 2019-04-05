@@ -39,27 +39,31 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
     //   .and_then(|res| {
     //     res.into_body().concat2()
     //   });
-    let client = hyper::Client::new();
-    let f1 = client
-      .get("http://localhost:9000/api/users.json".parse().unwrap())
-      .and_then(|resp| {
-        println!("Status: {}", resp.status());
-        Ok(())
-      });
-      // .map_err(|so| {
+    for _iteration in 1..config.iterations {
+      let client = hyper::Client::new();
+      let f1 = client
+        .get("http://localhost:9000/api/users.json".parse().unwrap())
+        .and_then(|resp| {
+          println!("Status: {}", resp.status());
+          Ok(())
+        });
+        // .map_err(|so| {
 
-      // });
-    let f2 = client
-      .get("http://localhost:9000/api/organizations".parse().unwrap())
-      .and_then(|_resp| {
-        f1
-      })
-      .map_err(|err| {
-        println!("Error: {}", err);
-      });
+        // });
+      let f2 = client
+        .get("http://localhost:9000/api/organizations".parse().unwrap())
+        .and_then(|_resp| {
+          f1
+        })
+        .map_err(|err| {
+          println!("Error: {}", err);
+        });
 
+        // let uris = std::iter::repeat(f2).take(5);
+        // futures::future::Shared<f2>;
 
-      tokio::run(f2);
+        tokio::run(f2);
+      }
 
   } else {
     for iteration in 1..config.iterations {
