@@ -1,10 +1,11 @@
 use colored::*;
 use futures::{stream, Future, Stream};
-use hyper::{Client, Response};
+use hyper::Client;
 use hyper_tls::HttpsConnector;
 use serde_json;
 use std::collections::HashMap;
-use std::io::{self, Write};
+use std::io;
+use std::io::Write;
 use std::iter;
 use time;
 use yaml_rust::Yaml;
@@ -165,7 +166,7 @@ impl Request {
       headers.insert(header_name, interpolated_header.parse().unwrap());
     }
 
-    let foo = client
+    client
       .request(request)
       .map(move |response| {
         let duration_ms = (time::precise_time_s() - begin) * 1000.0;
@@ -197,7 +198,6 @@ impl Request {
         if let Some(ref key) = self.assign {
           // let data = String::new();
 
-          // TODO:
           // response.read_to_string(&mut data).unwrap();
           let data = "YOLO";
 

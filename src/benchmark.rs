@@ -7,7 +7,6 @@ use time;
 use futures::{stream, Future, Stream};
 use serde_json::Value;
 use yaml_rust::Yaml;
-use std::io::{self, Write};
 
 use crate::actions::{Report, Runnable};
 use crate::config;
@@ -25,39 +24,21 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
   let begin = time::precise_time_s();
 
   if config.throughput {
-    // TODO: Zip items instead of blocks
-    // for item in benchmark.iter() {
-    //   item.extreme(config.iterations as usize);
-    // }
-
-    // let uri2 = absolute_url.parse().unwrap();
-    // let _f1 = client
-    //   .get(uri2)
-    //   .map_err(|_res| {
-    //   });
-
-    // let _f2 = client
-    //   .get("http://localhost:9000/api/comments.json".parse().unwrap())
-    //   .and_then(|res| {
-    //     res.into_body().concat2()
-    //   });
-
     let client = hyper::Client::new();
     let uris = std::iter::repeat(0).take(config.iterations as usize);
     let nums = stream::iter_ok(uris)
-      .map(move |n| {
-        // let f1 = client
-        //   .get("http://localhost:9000/api/users.json".parse().unwrap())
-        //   .and_then(|resp| {
-        //     println!("Status: {}", resp.status());
-        //     futures::future::ok(())
-        //   });
+      .map(move |_n| {
+        let f1 = client
+          .get("http://localhost:9000/api/users.json".parse().unwrap())
+          .and_then(|resp| {
+            println!("Status: {}", resp.status());
+            futures::future::ok(())
+          });
 
         let f2 = client
           .get("http://localhost:9000/api/organizations".parse().unwrap())
           .and_then(|_resp| {
-            // f1
-            Ok(())
+            f1
           })
           .map_err(|err| {
             println!("Error: {}", err);
