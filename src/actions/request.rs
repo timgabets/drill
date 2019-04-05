@@ -135,27 +135,19 @@ impl Request {
       Client::builder().build::<_, hyper::Body>(https)
     };
 
-    let interpolated_body;
-
     // Resolve the body
-    let mut request = if let Some(body) = self.body.as_ref() {
-      interpolated_body = uninterpolator.get_or_insert(Interpolator::new(context, responses)).resolve(body);
-
-      // client.request(method, interpolated_base_url.as_str()).body(&interpolated_body)
-
-      hyper::Request::builder()
-        .method(self.method.to_uppercase().as_str())
-        .uri(interpolated_base_url)
-        .body(hyper::Body::from(interpolated_body))
-        .expect("request builder with body")
+    let interpolated_body = if let Some(body) = self.body.as_ref() {
+      uninterpolator.get_or_insert(Interpolator::new(context, responses)).resolve(body)
     } else {
-      // client.request(method, interpolated_base_url.as_str())
-      hyper::Request::builder()
-        .method(self.method.to_uppercase().as_str())
-        .uri(interpolated_base_url)
-        .body(hyper::Body::from(""))
-        .expect("request builder without body")
+      "".to_string()
     };
+
+    // Request building
+    let mut request = hyper::Request::builder()
+      .method(self.method.to_uppercase().as_str())
+      .uri(interpolated_base_url)
+      .body(hyper::Body::from(interpolated_body))
+      .expect("request builder without body");
 
     // Headers
     let headers = request.headers_mut();
