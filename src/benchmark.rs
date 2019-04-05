@@ -46,17 +46,18 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
     let uris = std::iter::repeat(0).take(config.iterations as usize);
     let nums = stream::iter_ok(uris)
       .map(move |n| {
-        let f1 = client
-          .get("http://localhost:9000/api/users.json".parse().unwrap())
-          .and_then(|resp| {
-            println!("Status: {}", resp.status());
-            futures::future::ok(())
-          });
+        // let f1 = client
+        //   .get("http://localhost:9000/api/users.json".parse().unwrap())
+        //   .and_then(|resp| {
+        //     println!("Status: {}", resp.status());
+        //     futures::future::ok(())
+        //   });
 
         let f2 = client
           .get("http://localhost:9000/api/organizations".parse().unwrap())
           .and_then(|_resp| {
-            f1
+            // f1
+            Ok(())
           })
           .map_err(|err| {
             println!("Error: {}", err);
@@ -72,33 +73,6 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
       });
 
     tokio::run(work);
-
-    // for _iteration in 1..config.iterations {
-    //   let client = hyper::Client::new();
-
-    //   // let uris = std::iter::repeat(f2).take(5);
-    //   // futures::future::Shared<f2>;
-
-    //   let work = stream::iter_ok(vec!["a", "b"])
-    //   .map(|_a| {
-    //   })
-    //   .buffer_unordered(203)
-    //   .and_then(|res| {
-    //     println!("Response: {}", res.status());
-    //     res.into_body()
-    //       .concat2()
-    //       .map_err(|e| panic!("Error collecting body: {}", e))
-    //   })
-    //   .for_each(|body| {
-    //     io::stdout()
-    //       .write_all(&body)
-    //       .map_err(|e| panic!("Error writing: {}", e))
-    //   })
-    //   .map_err(|e| panic!("Error making request: {}", e));
-
-    //   tokio::run(work);
-    //   // tokio::run(work);
-    // }
   } else {
     for iteration in 1..config.iterations {
       let mut responses: HashMap<String, Value> = HashMap::new();

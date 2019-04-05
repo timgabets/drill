@@ -1,8 +1,8 @@
 ---
 
-threads: 1
+threads: 10
 base: 'http://localhost:9000'
-iterations: 5000
+iterations: 100000
 
 plan:
   - name: Fetch users
