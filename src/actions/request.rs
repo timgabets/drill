@@ -252,12 +252,12 @@ impl Runnable for Request {
           .concat2()
           .map_err(|e| panic!("Error collecting body: {}", e))
       })
-    .for_each(|body| {
-      io::stdout()
-        .write_all(&body)
-        .map_err(|e| panic!("Error writing: {}", e))
-    })
-    .map_err(|e| panic!("Error making request: {}", e));
+      .for_each(|body| {
+        io::stdout()
+          .write_all(&body)
+          .map_err(|e| panic!("Error writing: {}", e))
+      })
+      .map_err(|e| panic!("Error making request: {}", e));
 
     // let resp = Response::new().with_status(StatusCode::NotFound);
     // futures::future::ok(resp);

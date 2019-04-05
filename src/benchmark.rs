@@ -3,9 +3,11 @@ use std::sync::Arc;
 use std::thread;
 use time;
 
-use futures::future::Future;
+// use futures::future::Future;
+use futures::{stream, Future, Stream};
 use serde_json::Value;
 use yaml_rust::Yaml;
+use std::io::{self, Write};
 
 use crate::actions::{Report, Runnable};
 use crate::config;
@@ -39,32 +41,64 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
     //   .and_then(|res| {
     //     res.into_body().concat2()
     //   });
-    for _iteration in 1..config.iterations {
-      let client = hyper::Client::new();
-      let f1 = client
-        .get("http://localhost:9000/api/users.json".parse().unwrap())
-        .and_then(|resp| {
-          println!("Status: {}", resp.status());
-          Ok(())
-        });
-        // .map_err(|so| {
 
-        // });
-      let f2 = client
-        .get("http://localhost:9000/api/organizations".parse().unwrap())
-        .and_then(|_resp| {
-          f1
-        })
-        .map_err(|err| {
-          println!("Error: {}", err);
-        });
+    let client = hyper::Client::new();
+    let uris = std::iter::repeat(0).take(config.iterations as usize);
+    let nums = stream::iter_ok(uris)
+      .map(move |n| {
+        let f1 = client
+          .get("http://localhost:9000/api/users.json".parse().unwrap())
+          .and_then(|resp| {
+            println!("Status: {}", resp.status());
+            futures::future::ok(())
+          });
 
-        // let uris = std::iter::repeat(f2).take(5);
-        // futures::future::Shared<f2>;
+        let f2 = client
+          .get("http://localhost:9000/api/organizations".parse().unwrap())
+          .and_then(|_resp| {
+            f1
+          })
+          .map_err(|err| {
+            println!("Error: {}", err);
+          });
 
-        tokio::run(f2);
-      }
+        f2
+      });
 
+    let work = nums
+      .buffer_unordered(250)
+      .for_each(|_n| {
+        Ok(())
+      });
+
+    tokio::run(work);
+
+    // for _iteration in 1..config.iterations {
+    //   let client = hyper::Client::new();
+
+    //   // let uris = std::iter::repeat(f2).take(5);
+    //   // futures::future::Shared<f2>;
+
+    //   let work = stream::iter_ok(vec!["a", "b"])
+    //   .map(|_a| {
+    //   })
+    //   .buffer_unordered(203)
+    //   .and_then(|res| {
+    //     println!("Response: {}", res.status());
+    //     res.into_body()
+    //       .concat2()
+    //       .map_err(|e| panic!("Error collecting body: {}", e))
+    //   })
+    //   .for_each(|body| {
+    //     io::stdout()
+    //       .write_all(&body)
+    //       .map_err(|e| panic!("Error writing: {}", e))
+    //   })
+    //   .map_err(|e| panic!("Error making request: {}", e));
+
+    //   tokio::run(work);
+    //   // tokio::run(work);
+    // }
   } else {
     for iteration in 1..config.iterations {
       let mut responses: HashMap<String, Value> = HashMap::new();
