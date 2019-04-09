@@ -84,14 +84,14 @@ impl Request {
     let mut uninterpolator = None;
 
     // Resolve the name
-    let interpolated_name = if self.name.contains("{") {
+    let interpolated_name = if Interpolator::has_interpolations(&self.name) {
       uninterpolator.get_or_insert(Interpolator::new(context, responses)).resolve(&self.name)
     } else {
       self.name.clone()
     };
 
     // Resolve the url
-    let interpolated_url = if self.url.contains("{") {
+    let interpolated_url = if Interpolator::has_interpolations(&self.url) {
       uninterpolator.get_or_insert(Interpolator::new(context, responses)).resolve(&self.url)
     } else {
       self.url.clone()
@@ -187,7 +187,7 @@ impl Request {
         reports.push(Report {
           name: self.name.to_owned(),
           duration: duration_ms,
-          status: 520u16,
+          status: response.status().as_u16(),
         });
 
         if let Some(cookie) = response.headers().get(hyper::header::SET_COOKIE) {
