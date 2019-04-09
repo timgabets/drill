@@ -166,9 +166,9 @@ impl Request {
       headers.insert(header_name, interpolated_header.parse().unwrap());
     }
 
-    client
+    let work = client
       .request(request)
-      .map(move |response| {
+      .and_then(|response| {
         let duration_ms = (time::precise_time_s() - begin) * 1000.0;
 
         if !config.quiet {
@@ -187,39 +187,34 @@ impl Request {
         reports.push(Report {
           name: self.name.to_owned(),
           duration: duration_ms,
-          status: response.status().as_u16(),
+          status: 520u16,
         });
 
         if let Some(cookie) = response.headers().get(hyper::header::SET_COOKIE) {
           let value = String::from(cookie.to_str().unwrap().split(";").next().unwrap());
+
           context.insert("cookie".to_string(), Yaml::String(value));
         }
 
+        response.into_body().concat2()
+      })
+      .map(|body| {
         if let Some(ref key) = self.assign {
-          // let data = String::new();
-
-          // response.read_to_string(&mut data).unwrap();
-          let data = "YOLO";
-
-          let value: serde_json::Value = serde_json::from_str(&data).unwrap();
+          let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
           responses.insert(key.to_owned(), value);
         }
       })
       .map_err(|_err| {
-        let _duration_ms = (time::precise_time_s() - begin) * 1000.0;
-
         if !config.quiet {
-          // TODO: println!("Error connecting '{}': {:?}", &interpolated_base_url.clone().as_str(), err);
+          // TODO: println!("Error connecting '{}': {:?}", interpolated_base_url.clone().as_str(), err);
         }
-
-        // TODO
-        // reports.push(Report {
-        //   name: self.name.to_owned(),
-        //   duration: duration_ms,
-        //   status: 520u16,
-        // });
       });
+
+    tokio_scoped::scope(|scope| {
+        // Use the scope to spawn the future.
+        scope.spawn(work);
+    });
   }
 }
 
@@ -258,9 +253,6 @@ impl Runnable for Request {
           .map_err(|e| panic!("Error writing: {}", e))
       })
       .map_err(|e| panic!("Error making request: {}", e));
-
-    // let resp = Response::new().with_status(StatusCode::NotFound);
-    // futures::future::ok(resp);
 
     tokio::run(work);
   }

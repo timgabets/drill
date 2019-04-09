@@ -18,9 +18,9 @@ impl<'a> Interpolator<'a> {
   pub fn new(context: &'a HashMap<String, Yaml>, responses: &'a HashMap<String, Value>) -> Interpolator<'a> {
     let regexp = format!(
       "{}{}{}",
-      INTERPOLATION_PREFIX,
+      regex::escape(INTERPOLATION_PREFIX),
       r" *([a-zA-Z\._]+[a-zA-Z\._0-9]*) *",
-      INTERPOLATION_SUFFIX
+      regex::escape(INTERPOLATION_SUFFIX)
     );
     Interpolator {
       context: context,
