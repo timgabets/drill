@@ -43,7 +43,7 @@ impl Runnable for Assign {
     Interpolator::has_interpolations(&self.value)
   }
 
-  fn extreme(&self, iterations: usize) {
+  fn extreme(&self, _iterations: usize) {
     // Do nothing
   }
 }

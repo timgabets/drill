@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
-use time;
 
-// use futures::future::Future;
 use futures::{stream, Future, Stream};
 use serde_json::Value;
 use yaml_rust::Yaml;
@@ -20,8 +18,6 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
   thread::sleep(std::time::Duration::new((delay * thread) as u64, 0));
 
   let mut global_reports = Vec::new();
-
-  let begin = time::precise_time_s();
 
   if config.throughput {
     let client = hyper::Client::new();
@@ -71,8 +67,6 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
       global_reports.push(reports);
     }
   }
-
-  println!("Total: {}ns", (time::precise_time_s() - begin.clone()) * 1000.0);
 
   global_reports.concat()
 }

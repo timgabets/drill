@@ -173,7 +173,7 @@ impl Request {
 
         if !config.quiet {
           let message = response.status().to_string();
-          let _status_text = if response.status().is_server_error() {
+          let status_text = if response.status().is_server_error() {
             message.red()
           } else if response.status().is_client_error() {
             message.purple()
@@ -181,7 +181,7 @@ impl Request {
             message.yellow()
           };
 
-          // TODO: println!("{:width$} {} {} {}", interpolated_name.green(), interpolated_base_url.blue().bold(), status_text, Request::format_time(duration_ms, config.nanosec).cyan(), width = 25);
+          println!("{:width$} {} {}", interpolated_name.green(), status_text, Request::format_time(duration_ms, config.nanosec).cyan(), width = 25);
         }
 
         reports.push(Report {
