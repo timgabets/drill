@@ -7,9 +7,8 @@ use serde_json::Value;
 use yaml_rust::Yaml;
 
 use crate::actions::{Report, Runnable};
-use crate::config;
 use crate::expandable::include;
-use crate::writer;
+use crate::{config, writer, futurize};
 
 use colored::*;
 
@@ -20,27 +19,12 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
   let mut global_reports = Vec::new();
 
   if config.throughput {
-    let client = hyper::Client::new();
     let uris = std::iter::repeat(0).take(config.iterations as usize);
+
     let nums = stream::iter_ok(uris)
       .map(move |_n| {
-        let f1 = client
-          .get("http://localhost:9000/api/users.json".parse().unwrap())
-          .and_then(|resp| {
-            println!("Status: {}", resp.status());
-            futures::future::ok(())
-          });
-
-        let f2 = client
-          .get("http://localhost:9000/api/organizations".parse().unwrap())
-          .and_then(|_resp| {
-            f1
-          })
-          .map_err(|err| {
-            println!("Error: {}", err);
-          });
-
-        f2
+        // TODO: try to avoid those clones
+        futurize::build(benchmark.clone(), config.clone())
       });
 
     let work = nums

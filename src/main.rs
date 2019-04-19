@@ -16,6 +16,7 @@ mod expandable;
 mod interpolator;
 mod reader;
 mod writer;
+mod futurize;
 
 use self::clap::{App, Arg};
 use crate::actions::Report;

@@ -20,11 +20,12 @@ const logger_handler = (character) => {
     setTimeout(() => {
       const filename = path.join(__dirname, 'responses', req.path)
       fs.readFile(filename, 'utf8', function(err, data) {
+        process.stdout.write(character);
+
         if (err) {
           res.status(404);
           res.end();
         } else {
-          process.stdout.write(character);
           res.write(data);
           res.end();
         }
