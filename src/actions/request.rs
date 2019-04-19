@@ -115,6 +115,9 @@ impl Request {
       interpolated_url
     };
 
+    // TODO: I don't understand why I need this
+    let interpolated_base_url_for_err = interpolated_base_url.clone();
+
     let client = if interpolated_base_url.starts_with("https") {
       // Build a TSL connector
       // TODO
@@ -205,9 +208,9 @@ impl Request {
           responses.insert(key.to_owned(), value);
         }
       })
-      .map_err(|_err| {
+      .map_err(|err| {
         if !config.quiet {
-          // TODO: println!("Error connecting '{}': {:?}", interpolated_base_url.clone().as_str(), err);
+          println!("Error connecting '{}': {:?}", interpolated_base_url_for_err.as_str(), err);
         }
       });
 
