@@ -99,7 +99,9 @@ fn compute_stats(sub_reports: &Vec<Report>) -> DrillStats {
   let mut sorted = durations.clone();
   sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
   let durlen = sorted.len();
-  let median_duration = if durlen % 2 == 0 {
+  let median_duration = if durlen == 0 {
+    0.0
+  } else if durlen % 2 == 0 {
     sorted[durlen / 2]
   } else if durlen > 1 {
     (sorted[durlen / 2] + sorted[durlen / 2 + 1]) / 2f64

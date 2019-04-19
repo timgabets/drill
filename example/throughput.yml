@@ -2,7 +2,7 @@
 
 threads: 1
 base: 'http://localhost:9000'
-iterations: 8000
+iterations: 80
 
 plan:
   - name: Fetch users
