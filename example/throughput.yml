@@ -12,3 +12,7 @@ plan:
   - name: Fetch organizations
     request:
       url: /api/organizations
+
+  - name: Fetch comments
+    request:
+      url: /api/subcomments.json
