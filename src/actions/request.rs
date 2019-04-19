@@ -212,8 +212,7 @@ impl Request {
       });
 
     tokio_scoped::scope(|scope| {
-        // Use the scope to spawn the future.
-        scope.spawn(work);
+      scope.spawn(work);
     });
   }
 }

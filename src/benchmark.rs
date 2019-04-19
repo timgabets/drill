@@ -51,12 +51,12 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
 
     tokio::run(work);
   } else {
-    for iteration in 1..config.iterations {
+    for iteration in 0..config.iterations {
       let mut responses: HashMap<String, Value> = HashMap::new();
       let mut context: HashMap<String, Yaml> = HashMap::new();
       let mut reports: Vec<Report> = Vec::new();
 
-      context.insert("iteration".to_string(), Yaml::String(iteration.to_string()));
+      context.insert("iteration".to_string(), Yaml::String((iteration + 1).to_string()));
       context.insert("thread".to_string(), Yaml::String(thread.to_string()));
       context.insert("base".to_string(), Yaml::String(config.base.to_string()));
 
