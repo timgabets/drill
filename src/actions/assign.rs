@@ -7,6 +7,8 @@ use yaml_rust::Yaml;
 use crate::config;
 use crate::interpolator::Interpolator;
 use crate::actions::{Report, Runnable};
+use futures::Future;
+use futures::future::ok;
 
 #[derive(Clone)]
 pub struct Assign {
@@ -45,5 +47,9 @@ impl Runnable for Assign {
 
   fn extreme(&self, _iterations: usize) {
     // Do nothing
+  }
+
+  fn async_execute(&self) -> Box<Future<Item=(), Error=()> + Send> {
+    Box::new(ok(()))
   }
 }

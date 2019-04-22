@@ -258,4 +258,19 @@ impl Runnable for Request {
 
     tokio::run(work);
   }
+
+  fn async_execute(&self) -> Box<Future<Item=(), Error=()> + Send> {
+    let client = hyper::Client::new();
+
+    let req = client
+      .get("http://localhost:9000/api/organizations".parse().unwrap())
+      .map(|_| {
+        println!("\n\nDone.");
+      })
+      .map_err(|err| {
+        println!("Error: {}", err);
+      });
+
+    Box::new(req)
+  }
 }

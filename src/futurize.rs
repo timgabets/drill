@@ -1,4 +1,4 @@
-use futures::{Future, Stream};
+use futures::Future;
 use std::sync::Arc;
 use crate::actions::Runnable;
 use crate::config;
@@ -43,11 +43,16 @@ pub fn build(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<con
     // futures::future::join_all(all).then(|a| { () })
 
     let client = hyper::Client::new();
+    let f0 = futures::future::ok(());
+
+    let _all = benchmark.iter().map(|item| item.async_execute() );
+
     let f1 = client
       .get("http://localhost:9000/api/users.json".parse().unwrap())
       .and_then(|resp| {
         println!("Status: {}", resp.status());
-        futures::future::ok(())
+
+        f0
       });
 
     let f2 = client
@@ -60,12 +65,13 @@ pub fn build(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<con
 
     let f3 = client
       .get("http://localhost:9000/api/comments.json".parse().unwrap())
-      .and_then(|_resp| {
+      .and_then(|resp| {
+        println!("Status: {}", resp.status());
+
         f2
-      })
-      .map_err(|err| {
-        println!("Error: {}", err);
       });
 
-    f3
+    f3.map_err(|err| {
+      println!("Error: {}", err);
+    })
 }
