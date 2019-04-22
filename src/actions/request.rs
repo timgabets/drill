@@ -15,7 +15,6 @@ use crate::config;
 use crate::interpolator::Interpolator;
 
 static USER_AGENT: &'static str = "drill";
-static CONCURRENCY: usize = 250;
 
 #[derive(Clone)]
 pub struct Request {
@@ -234,36 +233,11 @@ impl Runnable for Request {
       false // TODO: headers
   }
 
-  fn extreme(&self, iterations: usize) {
-    let absolute_url = format!("http://localhost:9000{}", self.url);
-    let client = Client::new();
-    let uri = absolute_url.parse().unwrap();
-    let uris = iter::repeat(uri).take(iterations);
-
-    let work = stream::iter_ok(uris)
-      .map(move |uri| client.get(uri))
-      .buffer_unordered(CONCURRENCY)
-      .and_then(|res| {
-        println!("Response: {}", res.status());
-        res.into_body()
-          .concat2()
-          .map_err(|e| panic!("Error collecting body: {}", e))
-      })
-      .for_each(|body| {
-        io::stdout()
-          .write_all(&body)
-          .map_err(|e| panic!("Error writing: {}", e))
-      })
-      .map_err(|e| panic!("Error making request: {}", e));
-
-    tokio::run(work);
-  }
-
   fn async_execute(&self) -> Box<Future<Item=(), Error=()> + Send> {
     let client = hyper::Client::new();
 
     let req = client
-      .get("http://localhost:9000/api/organizations".parse().unwrap())
+      .get(format!("http://localhost:9000{}", self.url).parse().unwrap())
       .map(|_| {
         println!("\n\nDone.");
       })

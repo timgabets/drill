@@ -45,10 +45,6 @@ impl Runnable for Assign {
     Interpolator::has_interpolations(&self.value)
   }
 
-  fn extreme(&self, _iterations: usize) {
-    // Do nothing
-  }
-
   fn async_execute(&self) -> Box<Future<Item=(), Error=()> + Send> {
     Box::new(ok(()))
   }

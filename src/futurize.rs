@@ -1,77 +1,19 @@
 use futures::Future;
+use futures::stream::iter_ok;
+use futures::stream::Stream;
 use std::sync::Arc;
 use crate::actions::Runnable;
 use crate::config;
 
-pub fn build(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<config::Config>) -> impl Future<Item=(), Error=()> {
+pub fn build(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<config::Config>) -> Box<Future<Item=(), Error=()> + Send> {
+    // let f0 = futures::future::ok(());
 
-    // let client = hyper::Client::new();
-    // client
-    //   .get("http://localhost:9000/api/organizations".parse().unwrap())
-    //   .map_err(|err| {
-    //     println!("Error: {}", err);
-    //   })
+    // let all = benchmark.iter().map(|item| item.clone().async_execute());
+    let all = vec![futures::future::ok(()), futures::future::ok(())];
 
-    // benchmark
-    //   .iter()
-    //   .for_each(|def| {
-    //     let client = hyper::Client::new();
+    let combined_task = iter_ok::<_, ()>(all).for_each(|f| f);
 
-    //     let req = client
-    //       .get("http://localhost:9000/api/organizations".parse().unwrap())
-    //       .and_then(|resp| {
-    //         println!("Status: {}", resp.status());
+    Box::new(combined_task)
 
-    //         previous.unwrap_or(last_ok)
-    //       });
-
-    //     previous = Some(req);
-    //   });
-
-    // let all = benchmark
-    //   .iter()
-    //   .map(|def| {
-    //     let client = hyper::Client::new();
-
-    //     client
-    //       .get("http://localhost:9000/api/organizations".parse().unwrap())
-    //       .map_err(|err| {
-    //         println!("Error: {}", err);
-    //       })
-    //   });
-
-    // futures::future::join_all(all).then(|a| { () })
-
-    let client = hyper::Client::new();
-    let f0 = futures::future::ok(());
-
-    let _all = benchmark.iter().map(|item| item.async_execute() );
-
-    let f1 = client
-      .get("http://localhost:9000/api/users.json".parse().unwrap())
-      .and_then(|resp| {
-        println!("Status: {}", resp.status());
-
-        f0
-      });
-
-    let f2 = client
-      .get("http://localhost:9000/api/organizations".parse().unwrap())
-      .and_then(|resp| {
-        println!("Status: {}", resp.status());
-
-        f1
-      });
-
-    let f3 = client
-      .get("http://localhost:9000/api/comments.json".parse().unwrap())
-      .and_then(|resp| {
-        println!("Status: {}", resp.status());
-
-        f2
-      });
-
-    f3.map_err(|err| {
-      println!("Error: {}", err);
-    })
+    //f0
 }

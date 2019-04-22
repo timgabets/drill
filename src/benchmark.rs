@@ -2,13 +2,14 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
 
-use futures::{stream, Future, Stream};
+use futures::Stream;
 use serde_json::Value;
 use yaml_rust::Yaml;
 
 use crate::actions::{Report, Runnable};
 use crate::expandable::include;
-use crate::{config, writer, futurize};
+use crate::{config, writer};
+use futures::stream::iter_ok;
 
 use colored::*;
 
@@ -19,21 +20,32 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
   let mut global_reports = Vec::new();
 
   if config.throughput {
-    let uris = std::iter::repeat(0).take(config.iterations as usize);
+    // let uris = std::iter::repeat(0).take(config.iterations as usize);
+    let all = benchmark.iter().map(|item| {
+        item.async_execute()
+    });
+    let combined_task = iter_ok::<_, ()>(all).for_each(|f| f);
 
-    let nums = stream::iter_ok(uris)
-      .map(move |_n| {
-        // TODO: try to avoid those clones
-        futurize::build(benchmark.clone(), config.clone())
-      });
+    // let nums = stream::iter_ok(uris)
+    //   .map(|_n| {
+    //     // TODO: try to avoid those clones
+    //     // futurize::build(benchmark.clone(), config.clone())
+    //     //let all = vec![futures::future::ok(()), futures::future::ok(())];
 
-    let work = nums
-      .buffer_unordered(250)
-      .for_each(|_n| {
-        Ok(())
-      });
+    //     Box::new(combined_task)
+    //   });
 
-    tokio::run(work);
+    // let work = nums
+    //   .buffer_unordered(250)
+    //   .for_each(|_n| {
+    //     Ok(())
+    //   });
+
+    // tokio::run(work);
+    // tokio::run(combined_task);
+    tokio_scoped::scope(|scope| {
+      scope.spawn(combined_task);
+    });
   } else {
     for iteration in 0..config.iterations {
       let mut responses: HashMap<String, Value> = HashMap::new();
