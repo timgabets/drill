@@ -35,7 +35,6 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
     // // let nums = stream::iter_ok(uris)
     // //   .map(|_n| {
     // //     // TODO: try to avoid those clones
-    // //     // futurize::build(benchmark.clone(), config.clone())
     // //     //let all = vec![futures::future::ok(()), futures::future::ok(())];
 
     // //     Box::new(combined_task)
