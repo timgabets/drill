@@ -2,14 +2,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
 
-use futures::Stream;
 use serde_json::Value;
 use yaml_rust::Yaml;
 
 use crate::actions::{Report, Runnable};
 use crate::expandable::include;
 use crate::{config, writer};
-// use futures::stream::iter_ok;
 
 use colored::*;
 
@@ -20,6 +18,14 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
   let mut global_reports = Vec::new();
 
   if config.throughput {
+    // let mut responses: HashMap<String, Value> = HashMap::new();
+    // let mut context: HashMap<String, Yaml> = HashMap::new();
+    // let mut reports: Vec<Report> = Vec::new();
+
+    // let all = benchmark.iter().map(move |item| {
+    //   item.execute(&mut context, &mut responses, &mut reports, &config)
+    // });
+
     // // let uris = std::iter::repeat(0).take(config.iterations as usize);
     // let all = benchmark.iter().map(|item| {
     //     item.async_execute()

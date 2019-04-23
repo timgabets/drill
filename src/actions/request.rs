@@ -1,12 +1,9 @@
 use colored::*;
-use futures::{stream, Future, Stream};
+use futures::{Future, Stream};
 use hyper::Client;
 use hyper_tls::HttpsConnector;
 use serde_json;
 use std::collections::HashMap;
-use std::io;
-use std::io::Write;
-use std::iter;
 use time;
 use yaml_rust::Yaml;
 
@@ -173,7 +170,6 @@ impl Runnable for Request {
     let work = client
       .request(request)
       .and_then(move |response| {
-        let begin = time::precise_time_s();
         let duration_ms = (time::precise_time_s() - begin) * 1000.0;
 
         if !config.quiet {
@@ -203,17 +199,17 @@ impl Runnable for Request {
 
         response.into_body().concat2()
       })
-      .map(|_body| {
-        //if let Some(ref key) = self.assign {
-        //  let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+      .map(move |body| {
+        if let Some(ref key) = self.assign {
+          let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
-        //  responses.insert(key.to_owned(), value);
-        //}
+          responses.insert(key.to_owned(), value);
+        }
       })
-      .map_err(|err| {
-        // if !config.quiet {
-        //   println!("Error connecting '{}': {:?}", interpolated_base_url_for_err.as_str(), err);
-        // }
+      .map_err(move |err| {
+        if !config.quiet {
+          println!("Error connecting '{}': {:?}", interpolated_base_url_for_err.as_str(), err);
+        }
       });
 
     Box::new(work)
@@ -227,19 +223,4 @@ impl Runnable for Request {
       self.assign.is_some() ||
       false // TODO: headers
   }
-
-  // fn async_execute(&self) -> Box<Future<Item=(), Error=()> + Send> {
-  //   let client = hyper::Client::new();
-
-  //   let req = client
-  //     .get(format!("http://localhost:9000{}", self.url).parse().unwrap())
-  //     .map(|_| {
-  //       println!("\n\nDone.");
-  //     })
-  //     .map_err(|err| {
-  //       println!("Error: {}", err);
-  //     });
-
-  //   Box::new(req)
-  // }
 }

@@ -1,14 +1,13 @@
 use std::collections::HashMap;
 
 use colored::*;
-use serde_json::Value;
+use futures::Future;
+use futures::future::ok;
 use yaml_rust::Yaml;
 
 use crate::config;
 use crate::interpolator::Interpolator;
 use crate::actions::{Report, Runnable};
-use futures::Future;
-use futures::future::ok;
 
 #[derive(Clone)]
 pub struct Assign {
@@ -32,13 +31,14 @@ impl Assign {
 }
 
 impl Runnable for Assign {
-  fn execute<'a>(&'a self, context: &'a mut HashMap<String, Yaml>, responses: &'a mut HashMap<String, serde_json::Value>, reports: &'a mut Vec<Report>, config: &'a config::Config) -> Box<Future<Item=(), Error=()> + Send + 'a> {
+  fn execute<'a>(&'a self, context: &'a mut HashMap<String, Yaml>, _responses: &'a mut HashMap<String, serde_json::Value>, _reports: &'a mut Vec<Report>, config: &'a config::Config) -> Box<Future<Item=(), Error=()> + Send + 'a> {
     if !config.quiet {
       println!("{:width$} {}={}", self.name.green(), self.key.cyan().bold(), self.value.magenta(), width = 25);
     }
     // TODO: Should we interpolate the value?
     context.insert(self.key.to_owned(), Yaml::String(self.value.to_owned()));
 
+    // TODO: Create a future here
     Box::new(ok(()))
   }
 

@@ -3,14 +3,14 @@ mod request;
 
 pub use self::assign::Assign;
 pub use self::request::Request;
-use crate::config;
 
 use std::collections::HashMap;
 use std::fmt;
 
-use serde_json::Value;
 use yaml_rust::Yaml;
 use futures::Future;
+
+use crate::config;
 
 pub trait Runnable {
   fn execute<'a>(&'a self, context: &'a mut HashMap<String, Yaml>, responses: &'a mut HashMap<String, serde_json::Value>, reports: &'a mut Vec<Report>, config: &'a config::Config) -> Box<Future<Item=(), Error=()> + Send + 'a>;
