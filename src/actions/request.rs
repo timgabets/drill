@@ -1,9 +1,10 @@
+use std::collections::HashMap;
+
 use colored::*;
 use futures::{Future, Stream};
 use hyper::Client;
 use hyper_tls::HttpsConnector;
 use serde_json;
-use std::collections::HashMap;
 use time;
 use yaml_rust::Yaml;
 
