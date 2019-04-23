@@ -13,7 +13,7 @@ use yaml_rust::Yaml;
 use futures::Future;
 
 pub trait Runnable {
-  fn execute(&self, context: &mut HashMap<String, Yaml>, responses: &mut HashMap<String, Value>, reports: &mut Vec<Report>, config: &config::Config) -> Box<Future<Item=(), Error=()> + Send>;
+  fn execute<'a>(&'a self, context: &'a mut HashMap<String, Yaml>, responses: &'a mut HashMap<String, serde_json::Value>, reports: &'a mut Vec<Report>, config: &'a config::Config) -> Box<Future<Item=(), Error=()> + Send + 'a>;
   fn has_interpolations(&self) -> bool;
 }
 
