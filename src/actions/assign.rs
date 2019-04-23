@@ -32,20 +32,18 @@ impl Assign {
 }
 
 impl Runnable for Assign {
-  fn execute(&self, context: &mut HashMap<String, Yaml>, _responses: &mut HashMap<String, Value>, _reports: &mut Vec<Report>, _config: &config::Config) {
+  fn execute(&self, context: &mut HashMap<String, Yaml>, _responses: &mut HashMap<String, Value>, _reports: &mut Vec<Report>, _config: &config::Config) -> Box<Future<Item=(), Error=()> + Send> {
     if !_config.quiet {
       println!("{:width$} {}={}", self.name.green(), self.key.cyan().bold(), self.value.magenta(), width = 25);
     }
     // TODO: Should we interpolate the value?
     context.insert(self.key.to_owned(), Yaml::String(self.value.to_owned()));
+
+    Box::new(ok(()))
   }
 
   fn has_interpolations(&self) -> bool {
     Interpolator::has_interpolations(&self.name) ||
     Interpolator::has_interpolations(&self.value)
-  }
-
-  fn async_execute(&self) -> Box<Future<Item=(), Error=()> + Send> {
-    Box::new(ok(()))
   }
 }

@@ -9,7 +9,7 @@ use yaml_rust::Yaml;
 use crate::actions::{Report, Runnable};
 use crate::expandable::include;
 use crate::{config, writer};
-use futures::stream::iter_ok;
+// use futures::stream::iter_ok;
 
 use colored::*;
 
@@ -20,32 +20,32 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
   let mut global_reports = Vec::new();
 
   if config.throughput {
-    // let uris = std::iter::repeat(0).take(config.iterations as usize);
-    let all = benchmark.iter().map(|item| {
-        item.async_execute()
-    });
-    let combined_task = iter_ok::<_, ()>(all).for_each(|f| f);
+    // // let uris = std::iter::repeat(0).take(config.iterations as usize);
+    // let all = benchmark.iter().map(|item| {
+    //     item.async_execute()
+    // });
+    // let combined_task = iter_ok::<_, ()>(all).for_each(|f| f);
 
-    // let nums = stream::iter_ok(uris)
-    //   .map(|_n| {
-    //     // TODO: try to avoid those clones
-    //     // futurize::build(benchmark.clone(), config.clone())
-    //     //let all = vec![futures::future::ok(()), futures::future::ok(())];
+    // // let nums = stream::iter_ok(uris)
+    // //   .map(|_n| {
+    // //     // TODO: try to avoid those clones
+    // //     // futurize::build(benchmark.clone(), config.clone())
+    // //     //let all = vec![futures::future::ok(()), futures::future::ok(())];
 
-    //     Box::new(combined_task)
-    //   });
+    // //     Box::new(combined_task)
+    // //   });
 
-    // let work = nums
-    //   .buffer_unordered(250)
-    //   .for_each(|_n| {
-    //     Ok(())
-    //   });
+    // // let work = nums
+    // //   .buffer_unordered(250)
+    // //   .for_each(|_n| {
+    // //     Ok(())
+    // //   });
 
-    // tokio::run(work);
-    // tokio::run(combined_task);
-    tokio_scoped::scope(|scope| {
-      scope.spawn(combined_task);
-    });
+    // // tokio::run(work);
+    // // tokio::run(combined_task);
+    // tokio_scoped::scope(|scope| {
+    //   scope.spawn(combined_task);
+    // });
   } else {
     for iteration in 0..config.iterations {
       let mut responses: HashMap<String, Value> = HashMap::new();
@@ -57,7 +57,11 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
       context.insert("base".to_string(), Yaml::String(config.base.to_string()));
 
       for item in benchmark.iter() {
-        item.execute(&mut context, &mut responses, &mut reports, &config);
+        let work = item.execute(&mut context, &mut responses, &mut reports, &config);
+
+        tokio_scoped::scope(|scope| {
+          scope.spawn(work);
+        });
       }
 
       global_reports.push(reports);
