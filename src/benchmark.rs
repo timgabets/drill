@@ -4,7 +4,9 @@ use std::thread;
 
 use serde_json::Value;
 use yaml_rust::Yaml;
+use futures::future::Future;
 
+use crate::iteration::Iteration;
 use crate::actions::{Report, Runnable};
 use crate::expandable::include;
 use crate::{config, writer};
@@ -15,7 +17,7 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
   let delay = config.rampup / config.threads;
   thread::sleep(std::time::Duration::new((delay * thread) as u64, 0));
 
-  let mut global_reports = Vec::new();
+  let mut global_reports: Vec<Report> = Vec::new();
 
   if config.throughput {
     // let mut responses: HashMap<String, Value> = HashMap::new();
@@ -52,28 +54,51 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
     //   scope.spawn(combined_task);
     // });
   } else {
-    for iteration in 0..config.iterations {
-      let mut responses: HashMap<String, Value> = HashMap::new();
+    for idx in 0..config.iterations {
+      // let mut responses: HashMap<String, Value> = HashMap::new();
       let mut context: HashMap<String, Yaml> = HashMap::new();
-      let mut reports: Vec<Report> = Vec::new();
+      // let mut reports: Vec<Report> = Vec::new();
 
-      context.insert("iteration".to_string(), Yaml::String((iteration + 1).to_string()));
+      context.insert("iteration".to_string(), Yaml::String((idx + 1).to_string()));
       context.insert("thread".to_string(), Yaml::String(thread.to_string()));
       context.insert("base".to_string(), Yaml::String(config.base.to_string()));
 
-      for item in benchmark.iter() {
-        let work = item.execute(&mut context, &mut responses, &mut reports, &config);
+      let iteration = Iteration {
+        number: idx,
+        responses: HashMap::new(),
+        context: context,
+        reports: Vec::new(),
+      };
 
-        tokio_scoped::scope(|scope| {
-          scope.spawn(work);
-        });
-      }
+      let work = iteration.future(&benchmark);
 
-      global_reports.push(reports);
+      println!("FCS: {}", work);
+
+      // let f1 = benchmark.iter().nth(0).unwrap().execute(&mut context, &mut responses, &mut reports, &config);
+      // let (_f2, mut context3, mut responses3, mut reports3) = benchmark.iter().nth(1).unwrap().execute(&mut context2, &mut responses2, &mut reports2, &config);
+      // let (_f3, _context4, _responses4, _reports4) = benchmark.iter().nth(2).unwrap().execute(&mut context3, &mut responses3, &mut reports3, &config);
+
+      // tokio_scoped::scope(|scope| {
+      //   let (mut new_context, mut new_responses, mut new_reports) = scope.spawn(f1);
+      // });
+
+      // let all = benchmark.iter().map(|item| {
+      //   item.execute(&mut context, &mut responses, &mut reports, &config)
+      // });
+
+      //for item in benchmark.iter() {
+      //  let work = item.execute(&mut context, &mut responses, &mut reports, &config);
+
+      //  tokio_scoped::scope(|scope| {
+      //    scope.spawn(work);
+      //  });
+      //}
+
+      // global_reports.push(reports);
     }
   }
 
-  global_reports.concat()
+  global_reports
 }
 
 fn join<S: ToString>(l: Vec<S>, sep: &str) -> String {

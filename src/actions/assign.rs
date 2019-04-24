@@ -31,7 +31,21 @@ impl Assign {
 }
 
 impl Runnable for Assign {
-  fn execute<'a>(&'a self, context: &'a mut HashMap<String, Yaml>, _responses: &'a mut HashMap<String, serde_json::Value>, _reports: &'a mut Vec<Report>, config: &'a config::Config) -> Box<Future<Item=(), Error=()> + Send + 'a> {
+  fn execute<'a>(
+      &'a self,
+      context: &'a mut HashMap<String, Yaml>,
+      responses: &'a mut HashMap<String, serde_json::Value>,
+      reports: &'a mut Vec<Report>,
+      config: &'a config::Config
+  ) -> (
+    Box<
+      Future<Item=(
+        &mut HashMap<String, Yaml>,
+        &mut HashMap<String, serde_json::Value>,
+        &mut Vec<Report>
+      ), Error=()>
+    + Send + 'a>
+  ) {
     if !config.quiet {
       println!("{:width$} {}={}", self.name.green(), self.key.cyan().bold(), self.value.magenta(), width = 25);
     }
@@ -39,7 +53,7 @@ impl Runnable for Assign {
     context.insert(self.key.to_owned(), Yaml::String(self.value.to_owned()));
 
     // TODO: Create a future here
-    Box::new(ok(()))
+    (Box::new(ok((context, responses, reports))))
   }
 
   fn has_interpolations(&self) -> bool {

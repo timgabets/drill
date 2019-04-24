@@ -13,7 +13,21 @@ use futures::Future;
 use crate::config;
 
 pub trait Runnable {
-  fn execute<'a>(&'a self, context: &'a mut HashMap<String, Yaml>, responses: &'a mut HashMap<String, serde_json::Value>, reports: &'a mut Vec<Report>, config: &'a config::Config) -> Box<Future<Item=(), Error=()> + Send + 'a>;
+  fn execute<'a>(
+      &'a self,
+      context: &'a mut HashMap<String, Yaml>,
+      responses: &'a mut HashMap<String, serde_json::Value>,
+      reports: &'a mut Vec<Report>,
+      config: &'a config::Config
+  ) -> (
+    Box<
+      Future<Item=(
+        &mut HashMap<String, Yaml>,
+        &mut HashMap<String, serde_json::Value>,
+        &mut Vec<Report>
+      ), Error=()>
+    + Send + 'a>
+  );
   fn has_interpolations(&self) -> bool;
 }
 

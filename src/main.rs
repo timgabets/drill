@@ -14,6 +14,7 @@ mod checker;
 mod config;
 mod expandable;
 mod interpolator;
+mod iteration;
 mod reader;
 mod writer;
 

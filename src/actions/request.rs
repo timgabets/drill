@@ -74,7 +74,21 @@ impl Request {
 }
 
 impl Runnable for Request {
-  fn execute<'a>(&'a self, context: &'a mut HashMap<String, Yaml>, responses: &'a mut HashMap<String, serde_json::Value>, reports: &'a mut Vec<Report>, config: &'a config::Config) -> Box<Future<Item=(), Error=()> + Send + 'a> {
+  fn execute<'a>(
+      &'a self,
+      context: &'a mut HashMap<String, Yaml>,
+      responses: &'a mut HashMap<String, serde_json::Value>,
+      reports: &'a mut Vec<Report>,
+      config: &'a config::Config
+  ) -> (
+    Box<
+      Future<Item=(
+        &mut HashMap<String, Yaml>,
+        &mut HashMap<String, serde_json::Value>,
+        &mut Vec<Report>
+      ), Error=()>
+    + Send + 'a>
+  ) {
     if self.with_item.is_some() {
       context.insert("item".to_string(), self.with_item.clone().unwrap());
     }
@@ -206,6 +220,8 @@ impl Runnable for Request {
 
           responses.insert(key.to_owned(), value);
         }
+
+        (context, responses, reports)
       })
       .map_err(move |err| {
         if !config.quiet {
