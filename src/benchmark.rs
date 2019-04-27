@@ -3,7 +3,6 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use yaml_rust::Yaml;
-use futures::future::Future;
 
 use crate::iteration::Iteration;
 use crate::actions::{Report, Runnable};
@@ -62,6 +61,7 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
       initial.insert("iteration".to_string(), Yaml::String((idx + 1).to_string()));
       initial.insert("thread".to_string(), Yaml::String(thread.to_string()));
       initial.insert("base".to_string(), Yaml::String(config.base.to_string()));
+      drop(initial);
 
       let iteration = Iteration {
         number: idx,
@@ -72,33 +72,20 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
 
       let work = iteration.future(&benchmark, &config);
 
-      tokio::run(work);
-
-      // println!("FCS: {}", work);
-
-      // let f1 = benchmark.iter().nth(0).unwrap().execute(&mut context, &mut responses, &mut reports, &config);
-      // let (_f2, mut context3, mut responses3, mut reports3) = benchmark.iter().nth(1).unwrap().execute(&mut context2, &mut responses2, &mut reports2, &config);
-      // let (_f3, _context4, _responses4, _reports4) = benchmark.iter().nth(2).unwrap().execute(&mut context3, &mut responses3, &mut reports3, &config);
-
-      // tokio_scoped::scope(|scope| {
-      //   let (mut new_context, mut new_responses, mut new_reports) = scope.spawn(f1);
-      // });
-
-      // let all = benchmark.iter().map(|item| {
-      //   item.execute(&mut context, &mut responses, &mut reports, &config)
-      // });
-
-      //for item in benchmark.iter() {
-      //  let work = item.execute(&mut context, &mut responses, &mut reports, &config);
-
-      //  tokio_scoped::scope(|scope| {
-      //    scope.spawn(work);
-      //  });
-      //}
+      tokio_scoped::scope(|scope| {
+        scope.spawn(work);
+      });
 
       // global_reports.push(reports);
     }
   }
+
+  // FIXME: Collect them
+  global_reports.push(Report {
+    name: "YOLO".to_string(),
+    duration: 123f64,
+    status: 123,
+  });
 
   global_reports
 }

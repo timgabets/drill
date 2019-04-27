@@ -22,11 +22,7 @@ impl Iteration {
     config: &'a config::Config
   ) -> Box<Future<Item=(), Error=()> + Send + 'a> {
     let mut all = benchmark.iter().map(|item| {
-      let context = self.context.clone();
-      let responses = self.responses.clone();
-      let reports = self.reports.clone();
-
-      item.execute(&context, &responses, &reports, config)
+      item.execute(&self.context, &self.responses, &self.reports, config)
     });
 
     // FIXME
