@@ -29,7 +29,9 @@ impl Iteration {
       item.execute(&context, &responses, &reports, config)
     });
 
-    let work = futures::future::join_all(all);
+    // FIXME: 
+    // let work = futures::future::join_all(all);
+    let work = all.nth(0).unwrap();
 
     Box::new(work)
   }

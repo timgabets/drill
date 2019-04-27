@@ -30,14 +30,14 @@ impl Assign {
 }
 
 impl Runnable for Assign {
-  fn execute<'a>(
-      &'a self,
-      context: &'a Arc<Mutex<HashMap<String, Yaml>>>,
-      responses: &'a Arc<Mutex<HashMap<String, serde_json::Value>>>,
-      reports: &'a Arc<Mutex<Vec<Report>>>,
-      config: &'a config::Config
+  fn execute(
+      &self,
+      context: &Arc<Mutex<HashMap<String, Yaml>>>,
+      responses: &Arc<Mutex<HashMap<String, serde_json::Value>>>,
+      reports: &Arc<Mutex<Vec<Report>>>,
+      config: &config::Config
   ) -> (
-    Box<Future<Item=(), Error=()> + Send + 'a>
+    Box<Future<Item=(), Error=()> + Send>
   ) {
     let mut context = context.lock().unwrap();
     let mut responses = responses.lock().unwrap();

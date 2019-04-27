@@ -75,14 +75,14 @@ impl Request {
 }
 
 impl Runnable for Request {
-  fn execute<'a>(
-      &'a self,
-      context: &'a Arc<Mutex<HashMap<String, Yaml>>>,
-      responses: &'a Arc<Mutex<HashMap<String, serde_json::Value>>>,
-      reports: &'a Arc<Mutex<Vec<Report>>>,
-      config: &'a config::Config
+  fn execute(
+      &self,
+      context: &Arc<Mutex<HashMap<String, Yaml>>>,
+      responses: &Arc<Mutex<HashMap<String, serde_json::Value>>>,
+      reports: &Arc<Mutex<Vec<Report>>>,
+      config: &config::Config
   ) -> (
-    Box<Future<Item=(), Error=()> + Send + 'a>
+    Box<Future<Item=(), Error=()> + Send>
   ) {
     let mut context = context.lock().unwrap();
     let mut responses = responses.lock().unwrap();
@@ -183,7 +183,7 @@ impl Runnable for Request {
 
     let work = client
       .request(request)
-      .and_then(move |response| {
+      .and_then(|response| {
         let duration_ms = (time::precise_time_s() - begin) * 1000.0;
 
         if !config.quiet {
@@ -213,7 +213,7 @@ impl Runnable for Request {
 
         response.into_body().concat2()
       })
-      .map(move |body| {
+      .map(|body| {
         if let Some(ref key) = self.assign {
           let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
@@ -222,11 +222,15 @@ impl Runnable for Request {
 
         ()
       })
-      .map_err(move |err| {
+      .map_err(|err| {
         if !config.quiet {
           println!("Error connecting '{}': {:?}", interpolated_base_url_for_err.as_str(), err);
         }
       });
+
+    drop(context);
+    drop(responses);
+    drop(reports);
 
     Box::new(work)
   }
