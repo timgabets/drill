@@ -21,13 +21,15 @@ impl Iteration {
     benchmark: &'a Arc<Vec<Box<(Runnable + Sync + Send)>>>,
     config: &'a config::Config
   ) -> Box<Future<Item=(), Error=()> + Send + 'a> {
-    let mut all = benchmark.iter().map(|item| {
+    let all = benchmark.iter().map(move |item| {
       item.execute(&self.context, &self.responses, &self.reports, config)
     });
 
     // FIXME
-    // let work = futures::future::join_all(all);
-    let work = all.nth(0).unwrap();
+    let work = futures::future::join_all(all)
+      .map(|_e| ())
+      .map_err(|_err| ());
+    // let work = all.nth(0).unwrap();
 
     Box::new(work)
   }
