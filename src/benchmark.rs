@@ -15,7 +15,7 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
   let delay = config.rampup / config.threads;
   thread::sleep(std::time::Duration::new((delay * thread) as u64, 0));
 
-  let mut global_reports: Vec<Report> = Vec::new();
+  let mut global_reports = Vec::new();
 
   if config.throughput {
     // let mut responses: HashMap<String, Value> = HashMap::new();
@@ -63,6 +63,8 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
       initial.insert("base".to_string(), Yaml::String(config.base.to_string()));
       drop(initial);
 
+      let collector = reports.clone();
+
       let iteration = Iteration {
         number: idx,
         responses: responses,
@@ -76,18 +78,12 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
         scope.spawn(work);
       });
 
-      // global_reports.push(reports);
+      let collected = collector.lock().unwrap();
+      global_reports.push(collected.clone());
     }
   }
 
-  // FIXME: Collect them
-  global_reports.push(Report {
-    name: "YOLO".to_string(),
-    duration: 123f64,
-    status: 123,
-  });
-
-  global_reports
+  global_reports.concat()
 }
 
 fn join<S: ToString>(l: Vec<S>, sep: &str) -> String {
