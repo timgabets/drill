@@ -199,26 +199,26 @@ impl Runnable for Request {
           println!("{:width$} {} {}", interpolated_name.green(), status_text, Request::format_time(duration_ms, config.nanosec).cyan(), width = 25);
         }
 
-        reports.push(Report {
-          name: self.name.clone(),
-          duration: duration_ms,
-          status: response.status().as_u16(),
-        });
+        // reports.push(Report {
+        //   name: self.name.clone(),
+        //   duration: duration_ms,
+        //   status: response.status().as_u16(),
+        // });
 
-        if let Some(cookie) = response.headers().get(hyper::header::SET_COOKIE) {
-          let value = String::from(cookie.to_str().unwrap().split(";").next().unwrap());
+        // if let Some(cookie) = response.headers().get(hyper::header::SET_COOKIE) {
+        //   let value = String::from(cookie.to_str().unwrap().split(";").next().unwrap());
 
-          context.insert("cookie".to_string(), Yaml::String(value));
-        }
+        //   context.insert("cookie".to_string(), Yaml::String(value));
+        // }
 
         response.into_body().concat2()
       })
       .map(|body| {
-        if let Some(ref key) = self.assign {
-          let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        // if let Some(ref key) = self.assign {
+        //   let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
-          responses.insert(key.to_owned(), value);
-        };
+        //   responses.insert(key.to_owned(), value);
+        // };
 
         ()
       })
