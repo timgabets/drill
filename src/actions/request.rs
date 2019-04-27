@@ -84,6 +84,7 @@ impl Runnable for Request {
   ) -> (
     Box<Future<Item=(), Error=()> + Send + 'a>
   ) {
+    let new_context = context.clone();
     let new_responses = responses.clone();
 
     let mut context = context.lock().unwrap();
@@ -209,11 +210,12 @@ impl Runnable for Request {
           status: response.status().as_u16(),
         });
 
-        // if let Some(cookie) = response.headers().get(hyper::header::SET_COOKIE) {
-        //   let value = String::from(cookie.to_str().unwrap().split(";").next().unwrap());
+        if let Some(cookie) = response.headers().get(hyper::header::SET_COOKIE) {
+          let value = String::from(cookie.to_str().unwrap().split(";").next().unwrap());
+          let mut context = new_context.lock().unwrap();
 
-        //   context.insert("cookie".to_string(), Yaml::String(value));
-        // }
+          context.insert("cookie".to_string(), Yaml::String(value));
+        }
 
         response.into_body().concat2()
       })
