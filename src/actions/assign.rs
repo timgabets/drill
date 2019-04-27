@@ -30,18 +30,16 @@ impl Assign {
 }
 
 impl Runnable for Assign {
-  fn execute(
-      &self,
-      context: &Arc<Mutex<HashMap<String, Yaml>>>,
-      responses: &Arc<Mutex<HashMap<String, serde_json::Value>>>,
-      reports: &Arc<Mutex<Vec<Report>>>,
-      config: &config::Config
+  fn execute<'a>(
+      &'a self,
+      context: &'a Arc<Mutex<HashMap<String, Yaml>>>,
+      _responses: &'a Arc<Mutex<HashMap<String, serde_json::Value>>>,
+      _reports: &'a Arc<Mutex<Vec<Report>>>,
+      config: &'a config::Config
   ) -> (
-    Box<Future<Item=(), Error=()> + Send>
+    Box<Future<Item=(), Error=()> + Send + 'a>
   ) {
     let mut context = context.lock().unwrap();
-    let mut responses = responses.lock().unwrap();
-    let mut reports = reports.lock().unwrap();
 
     if !config.quiet {
       println!("{:width$} {}={}", self.name.green(), self.key.cyan().bold(), self.value.magenta(), width = 25);

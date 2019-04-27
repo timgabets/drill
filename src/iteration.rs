@@ -16,12 +16,12 @@ pub struct Iteration {
 }
 
 impl Iteration {
-  pub fn future(
-    &self,
-    benchmark: &Arc<Vec<Box<(Runnable + Sync + Send)>>>,
-    config: &config::Config
-  ) -> Box<Future<Item=(), Error=()> + Send> {
-    let all = benchmark.iter().map(|item| {
+  pub fn future<'a>(
+    &'a self,
+    benchmark: &'a Arc<Vec<Box<(Runnable + Sync + Send)>>>,
+    config: &'a config::Config
+  ) -> Box<Future<Item=(), Error=()> + Send + 'a> {
+    let mut all = benchmark.iter().map(|item| {
       let context = self.context.clone();
       let responses = self.responses.clone();
       let reports = self.reports.clone();
@@ -29,7 +29,7 @@ impl Iteration {
       item.execute(&context, &responses, &reports, config)
     });
 
-    // FIXME: 
+    // FIXME
     // let work = futures::future::join_all(all);
     let work = all.nth(0).unwrap();
 

@@ -75,18 +75,20 @@ impl Request {
 }
 
 impl Runnable for Request {
-  fn execute(
-      &self,
-      context: &Arc<Mutex<HashMap<String, Yaml>>>,
-      responses: &Arc<Mutex<HashMap<String, serde_json::Value>>>,
-      reports: &Arc<Mutex<Vec<Report>>>,
-      config: &config::Config
+  fn execute<'a>(
+      &'a self,
+      context: &'a Arc<Mutex<HashMap<String, Yaml>>>,
+      responses: &'a Arc<Mutex<HashMap<String, serde_json::Value>>>,
+      reports: &'a Arc<Mutex<Vec<Report>>>,
+      config: &'a config::Config
   ) -> (
-    Box<Future<Item=(), Error=()> + Send>
+    Box<Future<Item=(), Error=()> + Send + 'a>
   ) {
+    let new_responses = responses.clone();
+
     let mut context = context.lock().unwrap();
-    let mut responses = responses.lock().unwrap();
-    let mut reports = reports.lock().unwrap();
+    let responses = responses.lock().unwrap();
+
 
     if self.with_item.is_some() {
       context.insert("item".to_string(), self.with_item.clone().unwrap());
@@ -183,7 +185,7 @@ impl Runnable for Request {
 
     let work = client
       .request(request)
-      .and_then(|response| {
+      .and_then(move |response| {
         let duration_ms = (time::precise_time_s() - begin) * 1000.0;
 
         if !config.quiet {
@@ -199,11 +201,13 @@ impl Runnable for Request {
           println!("{:width$} {} {}", interpolated_name.green(), status_text, Request::format_time(duration_ms, config.nanosec).cyan(), width = 25);
         }
 
-        // reports.push(Report {
-        //   name: self.name.clone(),
-        //   duration: duration_ms,
-        //   status: response.status().as_u16(),
-        // });
+        let mut reports = reports.lock().unwrap();
+
+        reports.push(Report {
+          name: self.name.clone(),
+          duration: duration_ms,
+          status: response.status().as_u16(),
+        });
 
         // if let Some(cookie) = response.headers().get(hyper::header::SET_COOKIE) {
         //   let value = String::from(cookie.to_str().unwrap().split(";").next().unwrap());
@@ -213,24 +217,21 @@ impl Runnable for Request {
 
         response.into_body().concat2()
       })
-      .map(|body| {
-        // if let Some(ref key) = self.assign {
-        //   let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+      .map(move |body| {
+        let mut responses = new_responses.lock().unwrap();
 
-        //   responses.insert(key.to_owned(), value);
-        // };
+        if let Some(ref key) = self.assign {
+          let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+          responses.insert(key.to_owned(), value);
+        };
 
         ()
       })
-      .map_err(|err| {
+      .map_err(move |err| {
         if !config.quiet {
           println!("Error connecting '{}': {:?}", interpolated_base_url_for_err.as_str(), err);
         }
       });
-
-    drop(context);
-    drop(responses);
-    drop(reports);
 
     Box::new(work)
   }

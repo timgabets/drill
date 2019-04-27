@@ -58,7 +58,7 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
       let context: Arc<Mutex<HashMap<String, Yaml>>> = Arc::new(Mutex::new(HashMap::new()));
       let reports = Arc::new(Mutex::new(Vec::new()));
 
-      let initial = context.lock().unwrap();
+      let mut initial = context.lock().unwrap();
       initial.insert("iteration".to_string(), Yaml::String((idx + 1).to_string()));
       initial.insert("thread".to_string(), Yaml::String(thread.to_string()));
       initial.insert("base".to_string(), Yaml::String(config.base.to_string()));
