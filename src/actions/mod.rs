@@ -5,8 +5,8 @@ pub use self::assign::Assign;
 pub use self::request::Request;
 
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::fmt;
-
 use yaml_rust::Yaml;
 use futures::Future;
 
@@ -15,18 +15,12 @@ use crate::config;
 pub trait Runnable {
   fn execute<'a>(
       &'a self,
-      context: &'a mut HashMap<String, Yaml>,
-      responses: &'a mut HashMap<String, serde_json::Value>,
-      reports: &'a mut Vec<Report>,
+      context: &'a Arc<Mutex<HashMap<String, Yaml>>>,
+      responses: &'a Arc<Mutex<HashMap<String, serde_json::Value>>>,
+      reports: &'a Arc<Mutex<Vec<Report>>>,
       config: &'a config::Config
   ) -> (
-    Box<
-      Future<Item=(
-        &mut HashMap<String, Yaml>,
-        &mut HashMap<String, serde_json::Value>,
-        &mut Vec<Report>
-      ), Error=()>
-    + Send + 'a>
+    Box<Future<Item=(), Error=()> + Send + 'a>
   );
   fn has_interpolations(&self) -> bool;
 }

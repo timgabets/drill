@@ -1,8 +1,7 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 
-use serde_json::Value;
 use yaml_rust::Yaml;
 use futures::future::Future;
 
@@ -55,24 +54,27 @@ fn thread_func(benchmark: Arc<Vec<Box<(Runnable + Sync + Send)>>>, config: Arc<c
     // });
   } else {
     for idx in 0..config.iterations {
-      // let mut responses: HashMap<String, Value> = HashMap::new();
-      let mut context: HashMap<String, Yaml> = HashMap::new();
-      // let mut reports: Vec<Report> = Vec::new();
+      let responses = Arc::new(Mutex::new(HashMap::new()));
+      let context: Arc<Mutex<HashMap<String, Yaml>>> = Arc::new(Mutex::new(HashMap::new()));
+      let reports = Arc::new(Mutex::new(Vec::new()));
 
-      context.insert("iteration".to_string(), Yaml::String((idx + 1).to_string()));
-      context.insert("thread".to_string(), Yaml::String(thread.to_string()));
-      context.insert("base".to_string(), Yaml::String(config.base.to_string()));
+      let initial = context.lock().unwrap();
+      initial.insert("iteration".to_string(), Yaml::String((idx + 1).to_string()));
+      initial.insert("thread".to_string(), Yaml::String(thread.to_string()));
+      initial.insert("base".to_string(), Yaml::String(config.base.to_string()));
 
       let iteration = Iteration {
         number: idx,
-        responses: HashMap::new(),
+        responses: responses,
         context: context,
-        reports: Vec::new(),
+        reports: reports,
       };
 
-      let work = iteration.future(&benchmark);
+      let work = iteration.future(&benchmark, &config);
 
-      println!("FCS: {}", work);
+      tokio::run(work);
+
+      // println!("FCS: {}", work);
 
       // let f1 = benchmark.iter().nth(0).unwrap().execute(&mut context, &mut responses, &mut reports, &config);
       // let (_f2, mut context3, mut responses3, mut reports3) = benchmark.iter().nth(1).unwrap().execute(&mut context2, &mut responses2, &mut reports2, &config);

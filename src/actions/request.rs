@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use colored::*;
 use futures::{Future, Stream};
+use std::sync::{Arc, Mutex};
 use hyper::Client;
 use hyper_tls::HttpsConnector;
 use serde_json;
@@ -9,8 +10,8 @@ use time;
 use yaml_rust::Yaml;
 
 use crate::actions::{Report, Runnable};
-use crate::config;
 use crate::interpolator::Interpolator;
+use crate::config;
 
 static USER_AGENT: &'static str = "drill";
 
@@ -76,19 +77,17 @@ impl Request {
 impl Runnable for Request {
   fn execute<'a>(
       &'a self,
-      context: &'a mut HashMap<String, Yaml>,
-      responses: &'a mut HashMap<String, serde_json::Value>,
-      reports: &'a mut Vec<Report>,
+      context: &'a Arc<Mutex<HashMap<String, Yaml>>>,
+      responses: &'a Arc<Mutex<HashMap<String, serde_json::Value>>>,
+      reports: &'a Arc<Mutex<Vec<Report>>>,
       config: &'a config::Config
   ) -> (
-    Box<
-      Future<Item=(
-        &mut HashMap<String, Yaml>,
-        &mut HashMap<String, serde_json::Value>,
-        &mut Vec<Report>
-      ), Error=()>
-    + Send + 'a>
+    Box<Future<Item=(), Error=()> + Send + 'a>
   ) {
+    let mut context = context.lock().unwrap();
+    let mut responses = responses.lock().unwrap();
+    let mut reports = reports.lock().unwrap();
+
     if self.with_item.is_some() {
       context.insert("item".to_string(), self.with_item.clone().unwrap());
     }
@@ -98,14 +97,14 @@ impl Runnable for Request {
 
     // Resolve the name
     let interpolated_name = if Interpolator::has_interpolations(&self.name) {
-      uninterpolator.get_or_insert(Interpolator::new(context, responses)).resolve(&self.name)
+      uninterpolator.get_or_insert(Interpolator::new(&context, &responses)).resolve(&self.name)
     } else {
       self.name.clone()
     };
 
     // Resolve the url
     let interpolated_url = if Interpolator::has_interpolations(&self.url) {
-      uninterpolator.get_or_insert(Interpolator::new(context, responses)).resolve(&self.url)
+      uninterpolator.get_or_insert(Interpolator::new(&context, &responses)).resolve(&self.url)
     } else {
       self.url.clone()
     };
@@ -154,7 +153,7 @@ impl Runnable for Request {
 
     // Resolve the body
     let interpolated_body = if let Some(body) = self.body.as_ref() {
-      uninterpolator.get_or_insert(Interpolator::new(context, responses)).resolve(body)
+      uninterpolator.get_or_insert(Interpolator::new(&context, &responses)).resolve(body)
     } else {
       "".to_string()
     };
@@ -176,7 +175,7 @@ impl Runnable for Request {
 
     // Resolve headers
     for (key, val) in self.headers.iter() {
-      let interpolated_header = uninterpolator.get_or_insert(Interpolator::new(context, responses)).resolve(val);
+      let interpolated_header = uninterpolator.get_or_insert(Interpolator::new(&context, &responses)).resolve(val);
 
       let header_name = hyper::header::HeaderName::from_lowercase(key.to_lowercase().as_bytes()).unwrap();
       headers.insert(header_name, interpolated_header.parse().unwrap());
@@ -219,9 +218,9 @@ impl Runnable for Request {
           let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
           responses.insert(key.to_owned(), value);
-        }
+        };
 
-        (context, responses, reports)
+        ()
       })
       .map_err(move |err| {
         if !config.quiet {

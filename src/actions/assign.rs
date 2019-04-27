@@ -1,9 +1,8 @@
-use std::collections::HashMap;
-
 use colored::*;
 use futures::Future;
-use futures::future::ok;
 use yaml_rust::Yaml;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 use crate::config;
 use crate::interpolator::Interpolator;
@@ -33,27 +32,24 @@ impl Assign {
 impl Runnable for Assign {
   fn execute<'a>(
       &'a self,
-      context: &'a mut HashMap<String, Yaml>,
-      responses: &'a mut HashMap<String, serde_json::Value>,
-      reports: &'a mut Vec<Report>,
+      context: &'a Arc<Mutex<HashMap<String, Yaml>>>,
+      responses: &'a Arc<Mutex<HashMap<String, serde_json::Value>>>,
+      reports: &'a Arc<Mutex<Vec<Report>>>,
       config: &'a config::Config
   ) -> (
-    Box<
-      Future<Item=(
-        &mut HashMap<String, Yaml>,
-        &mut HashMap<String, serde_json::Value>,
-        &mut Vec<Report>
-      ), Error=()>
-    + Send + 'a>
+    Box<Future<Item=(), Error=()> + Send + 'a>
   ) {
+    let mut context = context.lock().unwrap();
+    let mut responses = responses.lock().unwrap();
+    let mut reports = reports.lock().unwrap();
+
     if !config.quiet {
       println!("{:width$} {}={}", self.name.green(), self.key.cyan().bold(), self.value.magenta(), width = 25);
     }
     // TODO: Should we interpolate the value?
     context.insert(self.key.to_owned(), Yaml::String(self.value.to_owned()));
 
-    // TODO: Create a future here
-    (Box::new(ok((context, responses, reports))))
+    Box::new(futures::future::ok(()))
   }
 
   fn has_interpolations(&self) -> bool {
