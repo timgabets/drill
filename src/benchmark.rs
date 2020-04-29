@@ -11,7 +11,17 @@ use crate::config;
 use crate::expandable::include;
 use crate::writer;
 
+use rand::Rng;
+
 use colored::*;
+
+/// Generate plan id
+fn gen_plan_id() -> String {
+    let mut rng = rand::thread_rng();
+    let msg_id: u32 = rng.gen();
+    let msg_id = format!("{:08x}", msg_id);
+    msg_id.to_string()
+}
 
 fn thread_func(benchmark: Arc<Vec<Box<(dyn Runnable + Sync + Send)>>>, config: Arc<config::Config>, thread: i64) -> Vec<Report> {
   let delay = config.rampup / config.threads;
@@ -27,6 +37,7 @@ fn thread_func(benchmark: Arc<Vec<Box<(dyn Runnable + Sync + Send)>>>, config: A
     context.insert("iteration".to_string(), Yaml::String(iteration.to_string()));
     context.insert("thread".to_string(), Yaml::String(thread.to_string()));
     context.insert("base".to_string(), Yaml::String(config.base.to_string()));
+    context.insert("plan_id".to_string(), Yaml::String(gen_plan_id()));
 
     for item in benchmark.iter() {
       item.execute(&mut context, &mut responses, &mut reports, &config);

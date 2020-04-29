@@ -1,0 +1,10 @@
+---
+
+threads: 1
+base: 'https://gabets.ru'
+iterations: 100
+
+plan:
+  - name: Fetch index {{ plan_id }}
+    request:
+      url: /index.html
